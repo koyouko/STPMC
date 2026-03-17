@@ -96,6 +96,12 @@ cd C:\path\to\STPMC\backend
 mvn spring-boot:run
 ```
 
+Or from the repo root:
+
+```powershell
+.\run-backend.bat
+```
+
 ### Frontend
 
 ```bash
@@ -112,6 +118,12 @@ The Vite dev server runs on `http://localhost:5173` and proxies `/api` to the ba
 cd C:\path\to\STPMC\frontend
 npm install
 npm run dev
+```
+
+Or from the repo root:
+
+```powershell
+.\run-frontend.bat
 ```
 
 ## External API example
