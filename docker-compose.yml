@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: stp-mission-control-postgres
+    environment:
+      POSTGRES_DB: mission_control
+      POSTGRES_USER: mission_control
+      POSTGRES_PASSWORD: mission_control
+    ports:
+      - "5432:5432"
+    volumes:
+      - mission-control-postgres:/var/lib/postgresql/data
+
+volumes:
+  mission-control-postgres:

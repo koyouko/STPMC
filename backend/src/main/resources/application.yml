@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:missioncontrol;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+  h2:
+    console:
+      enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  security:
+    mode: ${APP_SECURITY_MODE:development}
+    allowed-origins:
+      - ${APP_ALLOWED_ORIGIN:http://localhost:5173}
+  health:
+    poll-interval-ms: ${APP_HEALTH_POLL_INTERVAL_MS:60000}
+    stale-after-ms: ${APP_HEALTH_STALE_AFTER_MS:180000}
+    refresh-cooldown-ms: ${APP_HEALTH_REFRESH_COOLDOWN_MS:60000}
+    kafka-timeout-ms: ${APP_KAFKA_TIMEOUT_MS:4000}
+    probe-timeout-ms: ${APP_PROBE_TIMEOUT_MS:3000}
+  defaults:
+    seed-demo-data: ${APP_SEED_DEMO_DATA:true}
+    seed-local-dev-cluster: ${APP_SEED_LOCAL_DEV_CLUSTER:true}
+    local-kafka-bootstrap: ${APP_LOCAL_KAFKA_BOOTSTRAP:localhost:9092}
+    local-schema-registry-url: ${APP_LOCAL_SCHEMA_REGISTRY_URL:http://localhost:8081}
