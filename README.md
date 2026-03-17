@@ -29,6 +29,30 @@ The health engine supports:
 
 ## Local run
 
+## Windows prerequisites
+
+For a Windows workstation, install these first:
+
+- Java JDK 17
+- Node.js 22 LTS
+- Git
+- Maven 3.9.12 recommended if you want to run Maven manually
+
+Important Maven note:
+
+- Spring Boot `3.3.5` supports Maven `3.6.3+`
+- This repo's Maven wrapper is pinned to Apache Maven `3.9.12`
+- If you install Maven manually on Windows, use `3.9.12` so it matches the wrapper behavior exactly
+
+Quick version checks in PowerShell:
+
+```powershell
+java -version
+node -v
+npm -v
+mvn -v
+```
+
 ### Backend
 
 ```bash
@@ -42,6 +66,7 @@ Default backend behavior:
 - Uses in-memory H2 by default
 - Seeds two demo clusters and one demo service account record
 - Uses development auth for platform/admin APIs via request headers or the built-in local admin fallback
+- If Kafka is available on `localhost:9092` and Schema Registry is available on `http://localhost:8081`, the app auto-seeds a `Local Kafka Dev` cluster and checks real health instead of demo-only placeholder health
 
 Optional Postgres:
 
@@ -55,6 +80,22 @@ DB_PASSWORD=mission_control \
 ./mvnw spring-boot:run
 ```
 
+### Windows backend commands
+
+Use the Maven wrapper on Windows like this:
+
+```powershell
+cd C:\path\to\STPMC\backend
+.\mvnw.cmd spring-boot:run
+```
+
+If you installed Maven manually instead of using the wrapper:
+
+```powershell
+cd C:\path\to\STPMC\backend
+mvn spring-boot:run
+```
+
 ### Frontend
 
 ```bash
@@ -64,6 +105,14 @@ npm run dev
 ```
 
 The Vite dev server runs on `http://localhost:5173` and proxies `/api` to the backend.
+
+### Windows frontend commands
+
+```powershell
+cd C:\path\to\STPMC\frontend
+npm install
+npm run dev
+```
 
 ## External API example
 
