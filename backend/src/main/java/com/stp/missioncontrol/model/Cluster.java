@@ -139,4 +139,28 @@ public class Cluster {
         }
         this.healthSnapshot = healthSnapshot;
     }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public void setEnvironment(ClusterEnvironment environment) {
+        this.environment = environment;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public void clearListeners() {
+        listeners.clear();
+    }
+
+    public void clearServiceEndpoints() {
+        serviceEndpoints.clear();
+    }
 }

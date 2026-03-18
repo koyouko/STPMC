@@ -10,6 +10,8 @@ interface SidebarTreeProps {
   onSelectEnvironment: (environment: ClusterEnvironment) => void
   onSelectCluster: (clusterId: string, environment: ClusterEnvironment) => void
   onSelectComponent: (clusterId: string, componentKind: string, environment: ClusterEnvironment) => void
+  onSelfService?: () => void
+  onAuditLog?: () => void
 }
 
 const environments: ClusterEnvironment[] = ['PROD', 'NON_PROD']
@@ -23,6 +25,8 @@ export function SidebarTree({
   onSelectEnvironment,
   onSelectCluster,
   onSelectComponent,
+  onSelfService,
+  onAuditLog,
 }: SidebarTreeProps) {
   return (
     <div className="sidebar-tree">
@@ -34,6 +38,28 @@ export function SidebarTree({
         <span>Fleet overview</span>
         <small>All clusters</small>
       </button>
+
+      {onSelfService && (
+        <button
+          type="button"
+          className="sidebar-overview-button sidebar-self-service-button"
+          onClick={onSelfService}
+        >
+          <span>Self-Service</span>
+          <small>Kafka tasks</small>
+        </button>
+      )}
+
+      {onAuditLog && (
+        <button
+          type="button"
+          className="sidebar-overview-button sidebar-audit-button"
+          onClick={onAuditLog}
+        >
+          <span>Audit Log</span>
+          <small>Activity trail</small>
+        </button>
+      )}
 
       {environments.map((environment) => {
         const environmentClusters = clusters.filter((cluster) => cluster.environment === environment)

@@ -9,9 +9,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -56,5 +58,26 @@ public class PlatformClusterController {
     ) {
         var cluster = clusterService.createCluster(request, principal.getName());
         return healthService.toDetail(cluster);
+    }
+
+    @GetMapping("/{clusterId}/config")
+    public ApiDtos.ClusterConfigResponse getClusterConfig(@PathVariable UUID clusterId) {
+        return clusterService.getClusterConfig(clusterId);
+    }
+
+    @PutMapping("/{clusterId}")
+    public ApiDtos.ClusterHealthDetailResponse updateCluster(
+            @PathVariable UUID clusterId,
+            @Valid @RequestBody ApiDtos.UpdateClusterRequest request,
+            Principal principal
+    ) {
+        var cluster = clusterService.updateCluster(clusterId, request, principal.getName());
+        return healthService.toDetail(cluster);
+    }
+
+    @DeleteMapping("/{clusterId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteCluster(@PathVariable UUID clusterId, Principal principal) {
+        clusterService.deleteCluster(clusterId, principal.getName());
     }
 }

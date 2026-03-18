@@ -3,18 +3,15 @@ package com.stp.missioncontrol.service;
 import com.stp.missioncontrol.config.AppProperties;
 import com.stp.missioncontrol.dto.ApiDtos;
 import com.stp.missioncontrol.model.Cluster;
-import com.stp.missioncontrol.model.ClusterAuthProfile;
 import com.stp.missioncontrol.model.ClusterHealthSnapshot;
 import com.stp.missioncontrol.model.ClusterListener;
 import com.stp.missioncontrol.model.ComponentHealthSnapshot;
 import com.stp.missioncontrol.model.HealthRefreshOperation;
-import com.stp.missioncontrol.model.MissionControlEnums.AuthProfileType;
 import com.stp.missioncontrol.model.MissionControlEnums.CheckSource;
 import com.stp.missioncontrol.model.MissionControlEnums.ComponentKind;
 import com.stp.missioncontrol.model.MissionControlEnums.HealthStatus;
 import com.stp.missioncontrol.model.MissionControlEnums.RefreshOperationStatus;
 import com.stp.missioncontrol.model.MissionControlEnums.RefreshTriggerType;
-import com.stp.missioncontrol.model.MissionControlEnums.ServiceEndpointProtocol;
 import com.stp.missioncontrol.model.MissionControlEnums.TokenScope;
 import com.stp.missioncontrol.model.ServiceEndpoint;
 import com.stp.missioncontrol.repository.ClusterHealthSnapshotRepository;
@@ -29,25 +26,17 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.AdminClientConfig;
-import org.apache.kafka.common.config.SaslConfigs;
-import org.apache.kafka.common.config.SslConfigs;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -62,6 +51,7 @@ public class HealthService {
     private final AuditService auditService;
     private final AppProperties properties;
     private final Executor missionControlTaskExecutor;
+    private final KafkaClientFactory kafkaClientFactory;
     private final HttpClient httpClient;
 
     public HealthService(
@@ -70,7 +60,8 @@ public class HealthService {
             HealthRefreshOperationRepository refreshOperationRepository,
             AuditService auditService,
             AppProperties properties,
-            Executor missionControlTaskExecutor
+            Executor missionControlTaskExecutor,
+            KafkaClientFactory kafkaClientFactory
     ) {
         this.clusterRepository = clusterRepository;
         this.clusterHealthSnapshotRepository = clusterHealthSnapshotRepository;
@@ -78,6 +69,7 @@ public class HealthService {
         this.auditService = auditService;
         this.properties = properties;
         this.missionControlTaskExecutor = missionControlTaskExecutor;
+        this.kafkaClientFactory = kafkaClientFactory;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(properties.health().probeTimeoutMs()))
                 .build();
@@ -221,7 +213,7 @@ public class HealthService {
             List<ComponentHealthSnapshot> components = new ArrayList<>();
             components.add(probeKafka(cluster));
 
-            for (ComponentKind kind : List.of(ComponentKind.ZOOKEEPER, ComponentKind.SCHEMA_REGISTRY, ComponentKind.CONTROL_CENTER, ComponentKind.PROMETHEUS)) {
+            for (ComponentKind kind : List.of(ComponentKind.ZOOKEEPER, ComponentKind.SCHEMA_REGISTRY, ComponentKind.CONTROL_CENTER, ComponentKind.PROMETHEUS, ComponentKind.KRAFT, ComponentKind.MDS)) {
                 List<ServiceEndpoint> endpoints = cluster.getServiceEndpoints().stream()
                         .filter(ServiceEndpoint::isEnabled)
                         .filter(endpoint -> endpoint.getKind() == kind)
@@ -267,10 +259,7 @@ public class HealthService {
     }
 
     private ComponentHealthSnapshot probeKafka(Cluster cluster) {
-        ClusterListener listener = cluster.getListeners().stream()
-                .filter(ClusterListener::isPreferred)
-                .findFirst()
-                .orElseGet(() -> cluster.getListeners().stream().findFirst().orElse(null));
+        ClusterListener listener = kafkaClientFactory.resolveListener(cluster);
 
         Instant checkedAt = Instant.now();
         if (listener == null) {
@@ -286,37 +275,22 @@ public class HealthService {
             );
         }
 
-        Map<String, Object> config = new HashMap<>();
-        config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, listener.getBootstrapServer());
-        config.put(AdminClientConfig.CLIENT_ID_CONFIG, "mission-control-health-" + cluster.getId());
-        config.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, properties.health().kafkaTimeoutMs());
-        config.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, properties.health().kafkaTimeoutMs());
-
-        ClusterAuthProfile authProfile = listener.getAuthProfile();
-        config.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, authProfile.getSecurityProtocol());
-        applyAuthProfile(config, authProfile);
-
         Instant started = Instant.now();
         String previousKrb5 = System.getProperty("java.security.krb5.conf");
-        try {
-            if (authProfile.getType() == AuthProfileType.SASL_GSSAPI && authProfile.getKrb5ConfigPath() != null && !authProfile.getKrb5ConfigPath().isBlank()) {
-                System.setProperty("java.security.krb5.conf", authProfile.getKrb5ConfigPath());
-            }
-            try (AdminClient adminClient = AdminClient.create(config)) {
-                String clusterId = adminClient.describeCluster().clusterId().get(properties.health().kafkaTimeoutMs(), TimeUnit.MILLISECONDS);
-                int nodeCount = adminClient.describeCluster().nodes().get(properties.health().kafkaTimeoutMs(), TimeUnit.MILLISECONDS).size();
-                long latency = Duration.between(started, Instant.now()).toMillis();
-                return new ComponentHealthSnapshot(
-                        ComponentKind.KAFKA,
-                        nodeCount > 0 ? HealthStatus.HEALTHY : HealthStatus.DEGRADED,
-                        CheckSource.KAFKA_CLIENT,
-                        listener.getBootstrapServer(),
-                        latency,
-                        "Cluster id " + clusterId + ", brokers " + nodeCount,
-                        null,
-                        Instant.now()
-                );
-            }
+        try (AdminClient adminClient = kafkaClientFactory.createAdminClient(cluster, properties.health().kafkaTimeoutMs())) {
+            String clusterId = adminClient.describeCluster().clusterId().get(properties.health().kafkaTimeoutMs(), TimeUnit.MILLISECONDS);
+            int nodeCount = adminClient.describeCluster().nodes().get(properties.health().kafkaTimeoutMs(), TimeUnit.MILLISECONDS).size();
+            long latency = Duration.between(started, Instant.now()).toMillis();
+            return new ComponentHealthSnapshot(
+                    ComponentKind.KAFKA,
+                    nodeCount > 0 ? HealthStatus.HEALTHY : HealthStatus.DEGRADED,
+                    CheckSource.KAFKA_CLIENT,
+                    listener.getBootstrapServer(),
+                    latency,
+                    "Cluster id " + clusterId + ", brokers " + nodeCount,
+                    null,
+                    Instant.now()
+            );
         } catch (Exception exception) {
             long latency = Duration.between(started, Instant.now()).toMillis();
             return new ComponentHealthSnapshot(
@@ -330,43 +304,7 @@ public class HealthService {
                     Instant.now()
             );
         } finally {
-            if (previousKrb5 == null) {
-                System.clearProperty("java.security.krb5.conf");
-            } else {
-                System.setProperty("java.security.krb5.conf", previousKrb5);
-            }
-        }
-    }
-
-    private void applyAuthProfile(Map<String, Object> config, ClusterAuthProfile authProfile) {
-        if (authProfile.getType() == AuthProfileType.PLAINTEXT) {
-            return;
-        }
-        if (authProfile.getTruststorePath() != null && !authProfile.getTruststorePath().isBlank()) {
-            config.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, authProfile.getTruststorePath());
-        }
-        readSecret(authProfile.getTruststorePasswordFile()).ifPresent(secret ->
-                config.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, secret));
-
-        if (authProfile.getType() == AuthProfileType.MTLS_SSL) {
-            if (authProfile.getKeystorePath() != null && !authProfile.getKeystorePath().isBlank()) {
-                config.put(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG, authProfile.getKeystorePath());
-            }
-            readSecret(authProfile.getKeystorePasswordFile()).ifPresent(secret ->
-                    config.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, secret));
-            readSecret(authProfile.getKeyPasswordFile()).ifPresent(secret ->
-                    config.put(SslConfigs.SSL_KEY_PASSWORD_CONFIG, secret));
-        }
-
-        if (authProfile.getType() == AuthProfileType.SASL_GSSAPI) {
-            config.put(SaslConfigs.SASL_MECHANISM, "GSSAPI");
-            config.put(SaslConfigs.SASL_KERBEROS_SERVICE_NAME, authProfile.getSaslServiceName() == null ? "kafka" : authProfile.getSaslServiceName());
-            String jaasConfig = String.format(
-                    "com.sun.security.auth.module.Krb5LoginModule required useKeyTab=true storeKey=true keyTab=\"%s\" principal=\"%s\";",
-                    authProfile.getKeytabPath(),
-                    authProfile.getPrincipal()
-            );
-            config.put(SaslConfigs.SASL_JAAS_CONFIG, jaasConfig);
+            kafkaClientFactory.restoreKrb5(previousKrb5);
         }
     }
 
@@ -524,17 +462,6 @@ public class HealthService {
             }
         }
         throw new IllegalArgumentException("Token is missing required scopes");
-    }
-
-    private Optional<String> readSecret(String path) {
-        if (path == null || path.isBlank()) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(Files.readString(Path.of(path)).trim());
-        } catch (IOException exception) {
-            return Optional.empty();
-        }
     }
 
     private String extractVersion(String body, String fallbackVersion) {

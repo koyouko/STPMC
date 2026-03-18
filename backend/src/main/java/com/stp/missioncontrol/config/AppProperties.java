@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record AppProperties(
         Security security,
         Health health,
+        SelfService selfService,
         Defaults defaults
 ) {
 
@@ -22,6 +23,11 @@ public record AppProperties(
             long refreshCooldownMs,
             int kafkaTimeoutMs,
             int probeTimeoutMs
+    ) {
+    }
+
+    public record SelfService(
+            int kafkaTimeoutMs
     ) {
     }
 

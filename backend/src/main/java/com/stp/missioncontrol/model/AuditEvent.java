@@ -49,4 +49,12 @@ public class AuditEvent {
             createdAt = Instant.now();
         }
     }
+
+    public UUID getId() { return id; }
+    public String getActor() { return actor; }
+    public String getAction() { return action; }
+    public String getEntityType() { return entityType; }
+    public String getEntityId() { return entityId; }
+    public String getDetails() { return details; }
+    public Instant getCreatedAt() { return createdAt; }
 }

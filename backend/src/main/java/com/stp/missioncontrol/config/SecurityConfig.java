@@ -47,6 +47,7 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/error").permitAll()
+                        .requestMatchers("/api/platform/self-service/**").hasAnyRole("PLATFORM_ADMIN", "OPERATOR")
                         .requestMatchers(HttpMethod.GET, "/api/platform/**").hasAnyRole("PLATFORM_ADMIN", "OPERATOR", "AUDITOR")
                         .requestMatchers("/api/platform/**").hasAnyRole("PLATFORM_ADMIN", "OPERATOR")
                         .requestMatchers("/api/admin/**").hasRole("PLATFORM_ADMIN")
@@ -65,7 +66,7 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(properties.security().allowedOrigins());
-        configuration.setAllowedMethods(List.of("GET", "POST", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

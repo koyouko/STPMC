@@ -8,7 +8,15 @@ export function formatTimestamp(value: string | null, emptyLabel = 'No snapshot 
   }).format(new Date(value))
 }
 
+const LABEL_OVERRIDES: Record<string, string> = {
+  KRAFT: 'KRaft',
+  MDS: 'MDS',
+  SCHEMA_REGISTRY: 'Schema Registry',
+  CONTROL_CENTER: 'Control Center',
+}
+
 export function formatLabel(value: string) {
+  if (LABEL_OVERRIDES[value]) return LABEL_OVERRIDES[value]
   return value
     .toLowerCase()
     .split('_')

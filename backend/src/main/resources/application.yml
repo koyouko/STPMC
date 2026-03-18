@@ -34,8 +34,10 @@ app:
     refresh-cooldown-ms: ${APP_HEALTH_REFRESH_COOLDOWN_MS:60000}
     kafka-timeout-ms: ${APP_KAFKA_TIMEOUT_MS:4000}
     probe-timeout-ms: ${APP_PROBE_TIMEOUT_MS:3000}
+  self-service:
+    kafka-timeout-ms: ${APP_SELF_SERVICE_KAFKA_TIMEOUT_MS:10000}
   defaults:
     seed-demo-data: ${APP_SEED_DEMO_DATA:true}
     seed-local-dev-cluster: ${APP_SEED_LOCAL_DEV_CLUSTER:true}
     local-kafka-bootstrap: ${APP_LOCAL_KAFKA_BOOTSTRAP:localhost:9092}
-    local-schema-registry-url: ${APP_LOCAL_SCHEMA_REGISTRY_URL:http://localhost:8081}
+    local-schema-registry-url: ${APP_LOCAL_SCHEMA_REGISTRY_URL:http://localhost:9003}
