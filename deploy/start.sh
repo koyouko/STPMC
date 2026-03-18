@@ -23,16 +23,42 @@ print_banner() {
 }
 
 check_java() {
+  if command -v java &>/dev/null; then
+    # Java found — check version is 17+
+    JAVA_VER_NUM=$(java -version 2>&1 | head -1 | sed -E 's/.*"([0-9]+).*/\1/')
+    JAVA_VER=$(java -version 2>&1 | head -1)
+    if [ "$JAVA_VER_NUM" -ge 17 ] 2>/dev/null; then
+      echo -e "  ${GREEN}[OK]${NC} $JAVA_VER"
+      return 0
+    else
+      echo -e "  ${YELLOW}[WARN]${NC} Java $JAVA_VER_NUM found but 17+ required ($JAVA_VER)"
+    fi
+  else
+    echo -e "  ${YELLOW}[WARN]${NC} Java not found"
+  fi
+
+  # Attempt auto-install
+  echo "  Attempting to install Java 17..."
+  if command -v yum &>/dev/null; then
+    sudo yum install -y java-17-openjdk 2>&1 | tail -3
+  elif command -v dnf &>/dev/null; then
+    sudo dnf install -y java-17-openjdk 2>&1 | tail -3
+  elif command -v apt-get &>/dev/null; then
+    sudo apt-get update -qq && sudo apt-get install -y openjdk-17-jre-headless 2>&1 | tail -3
+  else
+    echo -e "  ${RED}[ERROR]${NC} Cannot auto-install. Install manually:"
+    echo "    RHEL/CentOS: sudo yum install java-17-openjdk"
+    echo "    Ubuntu/Debian: sudo apt install openjdk-17-jre-headless"
+    exit 1
+  fi
+
+  # Verify after install
   if ! command -v java &>/dev/null; then
-    echo -e "  ${RED}[ERROR]${NC} Java not found."
-    echo "  Install on RHEL 8:"
-    echo "    sudo yum install java-17-openjdk"
-    echo "  Or Java 21:"
-    echo "    sudo yum install java-21-openjdk"
+    echo -e "  ${RED}[ERROR]${NC} Java installation failed"
     exit 1
   fi
   JAVA_VER=$(java -version 2>&1 | head -1)
-  echo -e "  ${GREEN}[OK]${NC} $JAVA_VER"
+  echo -e "  ${GREEN}[OK]${NC} Installed $JAVA_VER"
 }
 
 check_jar() {
