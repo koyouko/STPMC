@@ -59,7 +59,7 @@ export default function ConsumerGroupDetailPage() {
     })
   }
 
-  const executeModal = async (approvalRef?: string) => {
+  const executeModal = async (_approvalRef?: string) => {
     if (!confirmModal) return
     setModalLoading(true)
     try {

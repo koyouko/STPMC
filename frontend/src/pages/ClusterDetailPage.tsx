@@ -38,17 +38,6 @@ export function ClusterDetailPage() {
     }
   }
 
-  async function handleDelete() {
-    if (!clusterId) return
-    try {
-      await apiClient.deleteCluster(clusterId)
-      await reloadClusters()
-      void navigate('/')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to deactivate cluster')
-    }
-  }
-
   return (
     <>
       <header className="hero">

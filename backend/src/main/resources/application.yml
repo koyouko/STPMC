@@ -28,6 +28,7 @@ app:
     mode: ${APP_SECURITY_MODE:development}
     allowed-origins:
       - ${APP_ALLOWED_ORIGIN:http://localhost:5173}
+      - http://localhost:8080
   health:
     poll-interval-ms: ${APP_HEALTH_POLL_INTERVAL_MS:60000}
     stale-after-ms: ${APP_HEALTH_STALE_AFTER_MS:180000}
