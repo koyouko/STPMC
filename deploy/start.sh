@@ -4,6 +4,11 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 JAR="$SCRIPT_DIR/mission-control.jar"
+
+# Auto-assemble JAR from split parts if needed
+if [ ! -f "$JAR" ] || [ "$(wc -c < "$JAR" 2>/dev/null)" -lt 1000000 ]; then
+    bash "$SCRIPT_DIR/assemble.sh"
+fi
 PID_FILE="$SCRIPT_DIR/.mc.pid"
 LOG_FILE="$SCRIPT_DIR/mission-control.log"
 PORT="${MC_PORT:-8080}"
