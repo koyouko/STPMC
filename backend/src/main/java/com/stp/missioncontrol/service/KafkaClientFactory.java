@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.function.Supplier;
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -23,6 +24,13 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class KafkaClientFactory {
+
+    /**
+     * Lock protecting the JVM-wide java.security.krb5.conf system property.
+     * Multiple clusters may use different Kerberos configs; this ensures
+     * the property is set/restored atomically around client creation.
+     */
+    private static final Object KRB5_LOCK = new Object();
 
     public ClusterListener resolveListener(Cluster cluster) {
         return cluster.getListeners().stream()
@@ -37,8 +45,7 @@ public class KafkaClientFactory {
             throw new IllegalStateException("Cluster has no configured listener");
         }
         Map<String, Object> config = buildBaseConfig(listener, "mission-control-" + cluster.getId(), timeoutMs);
-        applyKrb5IfNeeded(listener.getAuthProfile());
-        return AdminClient.create(config);
+        return withKrb5Context(listener.getAuthProfile(), () -> AdminClient.create(config));
     }
 
     public KafkaConsumer<byte[], byte[]> createConsumer(Cluster cluster, String groupId, int timeoutMs) {
@@ -53,8 +60,28 @@ public class KafkaClientFactory {
         config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
         config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 100);
-        applyKrb5IfNeeded(listener.getAuthProfile());
-        return new KafkaConsumer<>(config);
+        return withKrb5Context(listener.getAuthProfile(), () -> new KafkaConsumer<>(config));
+    }
+
+    /**
+     * Executes a supplier within a synchronized Kerberos context.
+     * Sets java.security.krb5.conf before the call and restores the previous
+     * value afterward, preventing concurrent cluster operations from
+     * overwriting each other's Kerberos configuration.
+     */
+    public <T> T withKrb5Context(ClusterAuthProfile authProfile, Supplier<T> action) {
+        if (authProfile.getType() != AuthProfileType.SASL_GSSAPI) {
+            return action.get();
+        }
+        synchronized (KRB5_LOCK) {
+            String previousKrb5 = System.getProperty("java.security.krb5.conf");
+            try {
+                applyKrb5IfNeeded(authProfile);
+                return action.get();
+            } finally {
+                restoreKrb5(previousKrb5);
+            }
+        }
     }
 
     public Map<String, Object> buildBaseConfig(ClusterListener listener, String clientId, int timeoutMs) {

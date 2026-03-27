@@ -3,7 +3,10 @@ package com.stp.missioncontrol.config;
 import com.stp.missioncontrol.security.DevUserAuthenticationFilter;
 import com.stp.missioncontrol.security.ServiceAccountAuthenticationFilter;
 import com.stp.missioncontrol.service.ServiceAccountService;
+import jakarta.annotation.PostConstruct;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -22,10 +25,27 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
+
     private final AppProperties properties;
 
     public SecurityConfig(AppProperties properties) {
         this.properties = properties;
+    }
+
+    @PostConstruct
+    void logSecurityMode() {
+        String mode = properties.security().mode();
+        if (!"saml".equalsIgnoreCase(mode)) {
+            log.warn("╔══════════════════════════════════════════════════════════════╗");
+            log.warn("║  SECURITY MODE: DEVELOPMENT                                 ║");
+            log.warn("║  DevUserAuthenticationFilter is active.                      ║");
+            log.warn("║  All API requests are auto-authenticated with full roles.    ║");
+            log.warn("║  Set APP_SECURITY_MODE=saml for production deployments.      ║");
+            log.warn("╚══════════════════════════════════════════════════════════════╝");
+        } else {
+            log.info("Security mode: SAML — production authentication enabled.");
+        }
     }
 
     @Bean

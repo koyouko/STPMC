@@ -188,7 +188,6 @@ public class KafkaAdminService {
     public ApiDtos.MessageCountResponse getMessageCount(UUID clusterId, String topicName) {
         Cluster cluster = resolveCluster(clusterId);
         int timeout = properties.selfService().kafkaTimeoutMs();
-        String previousKrb5 = System.getProperty("java.security.krb5.conf");
         try (KafkaConsumer<byte[], byte[]> consumer = kafkaClientFactory.createConsumer(cluster, "mission-control-count-" + UUID.randomUUID(), timeout)) {
             List<TopicPartition> partitions = consumer.partitionsFor(topicName).stream()
                     .map(info -> new TopicPartition(topicName, info.partition()))
@@ -205,8 +204,6 @@ public class KafkaAdminService {
             return new ApiDtos.MessageCountResponse(clusterId, topicName, partitionCounts, total);
         } catch (Exception e) {
             throw new RuntimeException("Failed to get message count for '" + topicName + "': " + unwrapMessage(e), e);
-        } finally {
-            kafkaClientFactory.restoreKrb5(previousKrb5);
         }
     }
 
@@ -509,11 +506,18 @@ public class KafkaAdminService {
 
     // ── Data Operations ───────────────────────────────────────────────
 
-    public ApiDtos.TopicDataDumpResponse dumpTopicMessages(UUID clusterId, ApiDtos.TopicDataDumpRequest request) {
+    private static final int MAX_DUMP_MESSAGES = 50;
+    private static final int MAX_VALUE_SIZE = 1024; // 1 KB
+
+    public ApiDtos.TopicDataDumpResponse dumpTopicMessages(UUID clusterId, ApiDtos.TopicDataDumpRequest request, String actor) {
         Cluster cluster = resolveCluster(clusterId);
         int timeout = properties.selfService().kafkaTimeoutMs();
-        int maxMessages = Math.min(request.maxMessages(), 100);
-        String previousKrb5 = System.getProperty("java.security.krb5.conf");
+        int maxMessages = Math.min(request.maxMessages(), MAX_DUMP_MESSAGES);
+
+        auditService.record(actor, "TOPIC_DATA_DUMP", "Topic", request.topicName(),
+                "Cluster " + clusterId + ", maxMessages=" + maxMessages
+                        + (request.partition() != null ? ", partition=" + request.partition() : ""));
+
         try (KafkaConsumer<byte[], byte[]> consumer = kafkaClientFactory.createConsumer(
                 cluster, "mission-control-dump-" + UUID.randomUUID(), timeout)) {
 
@@ -548,8 +552,8 @@ public class KafkaAdminService {
                     messages.add(new ApiDtos.DumpedMessage(
                             record.partition(),
                             record.offset(),
-                            record.key() != null ? new String(record.key(), StandardCharsets.UTF_8) : null,
-                            record.value() != null ? new String(record.value(), StandardCharsets.UTF_8) : null,
+                            record.key() != null ? truncate(new String(record.key(), StandardCharsets.UTF_8)) : null,
+                            record.value() != null ? truncate(new String(record.value(), StandardCharsets.UTF_8)) : null,
                             record.timestamp(),
                             headers
                     ));
@@ -559,9 +563,14 @@ public class KafkaAdminService {
             return new ApiDtos.TopicDataDumpResponse(clusterId, request.topicName(), messages);
         } catch (Exception e) {
             throw new RuntimeException("Failed to dump messages from '" + request.topicName() + "': " + unwrapMessage(e), e);
-        } finally {
-            kafkaClientFactory.restoreKrb5(previousKrb5);
         }
+    }
+
+    private String truncate(String value) {
+        if (value.length() <= MAX_VALUE_SIZE) {
+            return value;
+        }
+        return value.substring(0, MAX_VALUE_SIZE) + "... [truncated, " + value.length() + " bytes total]";
     }
 
     // ── Helpers ───────────────────────────────────────────────────────

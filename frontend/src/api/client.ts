@@ -36,10 +36,15 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
-const defaultHeaders = {
+const defaultHeaders: Record<string, string> = {
   'Content-Type': 'application/json',
-  'X-MC-User': 'frontend-operator',
-  'X-MC-Roles': 'PLATFORM_ADMIN,OPERATOR,AUDITOR',
+  // Dev auth headers are only sent during local development.
+  // In production (SAML), authentication is handled by the IdP — these headers are ignored.
+  ...(import.meta.env.DEV
+    ? {
+        'X-MC-User': 'frontend-operator',
+      }
+    : {}),
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
