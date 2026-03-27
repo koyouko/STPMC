@@ -9,7 +9,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface MetricsTargetRepository extends JpaRepository<MetricsTarget, UUID> {
 
-    List<MetricsTarget> findByClusterIdAndEnabledTrue(UUID clusterId);
-
-    void deleteByClusterId(UUID clusterId);
+    List<MetricsTarget> findByEnabledTrue();
 }

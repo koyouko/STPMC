@@ -122,7 +122,7 @@ export function AppLayout() {
             onSelectEnvironment={handleSelectEnvironment}
             onSelectCluster={handleSelectCluster}
             onSelectComponent={handleSelectComponent}
-            onMetrics={(clusterId) => void navigate(`/clusters/${clusterId}/metrics`)}
+            onMetrics={() => void navigate('/metrics')}
             onAuditLog={() => void navigate('/audit')}
           />
         </div>

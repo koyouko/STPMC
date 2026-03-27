@@ -2,7 +2,6 @@ package com.stp.missioncontrol.service;
 
 import com.stp.missioncontrol.dto.ApiDtos;
 import com.stp.missioncontrol.model.MetricsTarget;
-import com.stp.missioncontrol.repository.ClusterRepository;
 import com.stp.missioncontrol.repository.MetricsTargetRepository;
 import java.io.IOException;
 import java.net.URI;
@@ -19,6 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -32,16 +32,14 @@ public class MetricsScraperService {
     private static final int SCRAPE_TIMEOUT_MS = 5000;
     private static final Pattern LABEL_PATTERN = Pattern.compile("(\\w+)=\"([^\"]*)\"");
 
+    // JMX metric that carries the Kafka cluster UUID as a label value
+    private static final String CLUSTER_ID_METRIC = "kafka_server_KafkaServer_ClusterId";
+
     private final MetricsTargetRepository metricsTargetRepository;
-    private final ClusterRepository clusterRepository;
     private final HttpClient httpClient;
 
-    public MetricsScraperService(
-            MetricsTargetRepository metricsTargetRepository,
-            ClusterRepository clusterRepository
-    ) {
+    public MetricsScraperService(MetricsTargetRepository metricsTargetRepository) {
         this.metricsTargetRepository = metricsTargetRepository;
-        this.clusterRepository = clusterRepository;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(SCRAPE_TIMEOUT_MS))
                 .build();
@@ -49,19 +47,20 @@ public class MetricsScraperService {
 
     // ── Inventory management ──────────────────────────────────────────
 
+    /**
+     * Replaces the entire global target inventory with targets parsed from the CSV file.
+     * Format per line: host, port (optional, default 9404), role (optional), label (optional)
+     */
     @Transactional
-    public List<MetricsTarget> uploadInventory(UUID clusterId, MultipartFile file) throws IOException {
-        clusterRepository.findById(clusterId)
-                .orElseThrow(() -> new IllegalArgumentException("Cluster not found: " + clusterId));
-
+    public List<MetricsTarget> uploadInventory(MultipartFile file) throws IOException {
         String content = new String(file.getBytes(), StandardCharsets.UTF_8);
-        List<MetricsTarget> targets = parseInventoryCsv(clusterId, content);
+        List<MetricsTarget> targets = parseInventoryCsv(content);
 
         if (targets.isEmpty()) {
             throw new IllegalArgumentException("No valid targets found in the uploaded file");
         }
 
-        metricsTargetRepository.deleteByClusterId(clusterId);
+        metricsTargetRepository.deleteAll();
         return metricsTargetRepository.saveAll(targets);
     }
 
@@ -72,10 +71,10 @@ public class MetricsScraperService {
      * # host, port (optional, default 9404), role (optional, default BROKER), label (optional)
      * broker1.internal
      * broker2.internal,9404,BROKER,Broker Two
-     * zk1.internal,9404,ZOOKEEPER,ZooKeeper
+     * zk1.internal,9405,ZOOKEEPER,ZooKeeper One
      * </pre>
      */
-    private List<MetricsTarget> parseInventoryCsv(UUID clusterId, String content) {
+    private List<MetricsTarget> parseInventoryCsv(String content) {
         List<MetricsTarget> targets = new ArrayList<>();
         int lineNum = 0;
         for (String raw : content.split("\n")) {
@@ -105,7 +104,6 @@ public class MetricsScraperService {
                     : host;
 
             MetricsTarget target = new MetricsTarget();
-            target.setClusterId(clusterId);
             target.setHost(host);
             target.setMetricsPort(port);
             target.setRole(role);
@@ -117,15 +115,36 @@ public class MetricsScraperService {
 
     // ── Scraping ──────────────────────────────────────────────────────
 
-    public ApiDtos.ClusterMetricsScrapeResponse scrapeCluster(UUID clusterId) {
-        List<MetricsTarget> targets = metricsTargetRepository.findByClusterIdAndEnabledTrue(clusterId);
+    /**
+     * Scrapes all enabled targets, extracts the cluster ID from each broker's
+     * {@code kafka_server_KafkaServer_ClusterId} JMX metric label, and groups
+     * the results by discovered cluster ID.
+     * Unreachable or non-Kafka targets are grouped under a {@code null} cluster ID.
+     */
+    public ApiDtos.MetricsScrapeResponse scrapeAll() {
+        List<MetricsTarget> targets = metricsTargetRepository.findByEnabledTrue();
         Instant scrapedAt = Instant.now();
 
         List<ApiDtos.BrokerMetricsSample> samples = targets.stream()
                 .map(this::scrapeTarget)
                 .toList();
 
-        return new ApiDtos.ClusterMetricsScrapeResponse(clusterId, scrapedAt, samples);
+        // Group by discoveredClusterId (null key = unreachable / unknown)
+        Map<String, List<ApiDtos.BrokerMetricsSample>> grouped = samples.stream()
+                .collect(Collectors.groupingBy(
+                        s -> s.discoveredClusterId() != null ? s.discoveredClusterId() : "",
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+
+        List<ApiDtos.DiscoveredCluster> clusters = grouped.entrySet().stream()
+                .map(e -> new ApiDtos.DiscoveredCluster(
+                        e.getKey().isEmpty() ? null : e.getKey(),
+                        e.getValue()
+                ))
+                .toList();
+
+        return new ApiDtos.MetricsScrapeResponse(scrapedAt, clusters);
     }
 
     private ApiDtos.BrokerMetricsSample scrapeTarget(MetricsTarget target) {
@@ -212,12 +231,24 @@ public class MetricsScraperService {
     }
 
     /**
-     * Returns the value for a metric without a specific label key,
-     * treating that as the aggregate (all-topics) value.
+     * Extracts the Kafka cluster UUID from the {@code kafka_server_KafkaServer_ClusterId}
+     * metric. The JMX exporter exports this as a gauge with value 1.0 and the UUID
+     * in the {@code clusterId} label, e.g.:
+     * <pre>kafka_server_KafkaServer_ClusterId{clusterId="abc-123"} 1.0</pre>
+     */
+    private String extractClusterId(List<MetricSample> samples) {
+        return samples.stream()
+                .filter(s -> s.name().equals(CLUSTER_ID_METRIC) && s.labels().containsKey("clusterId"))
+                .findFirst()
+                .map(s -> s.labels().get("clusterId"))
+                .orElse(null);
+    }
+
+    /**
+     * Returns the value for a metric without a topic label (all-topics aggregate).
      * Falls back to the first matching sample if no unlabeled version exists.
      */
     private double getAggregateMetric(List<MetricSample> samples, String name) {
-        // Prefer sample with no topic label (all-topics aggregate)
         return samples.stream()
                 .filter(s -> s.name().equals(name) && !s.labels().containsKey("topic"))
                 .findFirst()
@@ -240,14 +271,11 @@ public class MetricsScraperService {
 
     // ── Metric extraction ─────────────────────────────────────────────
 
-    /**
-     * Extracts the key Confluent Platform 7.9 JMX metrics from a Prometheus scrape.
-     * Metric names follow the standard Confluent JMX Prometheus exporter convention.
-     */
     private ApiDtos.BrokerMetricsSample extractBrokerMetrics(
             MetricsTarget target, long latencyMs, List<MetricSample> samples) {
 
-        // Throughput
+        String discoveredClusterId = extractClusterId(samples);
+
         double messagesInPerSec = getAggregateMetric(samples,
                 "kafka_server_BrokerTopicMetrics_MessagesInPerSec_OneMinuteRate");
         double bytesInPerSec = getAggregateMetric(samples,
@@ -255,7 +283,6 @@ public class MetricsScraperService {
         double bytesOutPerSec = getAggregateMetric(samples,
                 "kafka_server_BrokerTopicMetrics_BytesOutPerSec_OneMinuteRate");
 
-        // Health indicators
         double underReplicatedPartitions = getAggregateMetric(samples,
                 "kafka_server_ReplicaManager_UnderReplicatedPartitions");
         double activeControllerCount = getAggregateMetric(samples,
@@ -265,23 +292,19 @@ public class MetricsScraperService {
         double brokerState = getAggregateMetric(samples,
                 "kafka_server_KafkaServer_BrokerState");
 
-        // Capacity
         double leaderCount = getAggregateMetric(samples,
                 "kafka_server_ReplicaManager_LeaderCount");
         double partitionCount = getAggregateMetric(samples,
                 "kafka_server_ReplicaManager_PartitionCount");
 
-        // ISR churn
         double isrShrinksPerSec = getAggregateMetric(samples,
                 "kafka_server_ReplicaManager_IsrShrinksPerSec_OneMinuteRate");
         double isrExpandsPerSec = getAggregateMetric(samples,
                 "kafka_server_ReplicaManager_IsrExpandsPerSec_OneMinuteRate");
 
-        // Request handler pool idle ratio (0..1, lower is busier)
         double requestHandlerIdle = getAggregateMetric(samples,
                 "kafka_server_KafkaRequestHandlerPool_RequestHandlerAvgIdlePercent");
 
-        // JVM heap (filtered by area="heap")
         double heapUsedBytes = getLabeledMetric(samples, "jvm_memory_bytes_used", "area", "heap");
         double heapMaxBytes = getLabeledMetric(samples, "jvm_memory_bytes_max", "area", "heap");
 
@@ -291,6 +314,7 @@ public class MetricsScraperService {
                 target.getMetricsPort(),
                 target.getRole(),
                 target.getLabel(),
+                discoveredClusterId,
                 true,
                 null,
                 Instant.now(),
@@ -319,6 +343,7 @@ public class MetricsScraperService {
                 target.getMetricsPort(),
                 target.getRole(),
                 target.getLabel(),
+                null,   // discoveredClusterId unknown when unreachable
                 false,
                 errorMessage,
                 Instant.now(),

@@ -15,7 +15,7 @@ export const router = createBrowserRouter([
       { path: '/clusters/new', element: <ClusterOnboardingPage /> },
       { path: '/clusters/:clusterId', element: <ClusterDetailPage /> },
       { path: '/clusters/:clusterId/edit', element: <ClusterEditPage /> },
-      { path: '/clusters/:clusterId/metrics', element: <ClusterMetricsPage /> },
+      { path: '/metrics', element: <ClusterMetricsPage /> },
       { path: '/audit', element: <AuditLogPage /> },
     ],
   },

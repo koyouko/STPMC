@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { apiClient } from '../api/client'
-import type { DashboardContext } from '../layouts/AppLayout'
-import type { BrokerMetricsSample, ClusterMetricsScrapeResponse, MetricsTargetResponse } from '../types/api'
+import type { BrokerMetricsSample, DiscoveredCluster, MetricsScrapeResponse } from '../types/api'
 
 // ── Helpers ───────────────────────────────────────────────────────
 
@@ -191,29 +189,56 @@ function BrokerMetricsCard({ sample }: { sample: BrokerMetricsSample }) {
   )
 }
 
+// ── Cluster group section ─────────────────────────────────────────
+
+function ClusterSection({ group }: { group: DiscoveredCluster }) {
+  const reachable = group.brokers.filter((b) => b.reachable).length
+  const total = group.brokers.length
+
+  return (
+    <section style={{ marginBottom: '2rem' }}>
+      <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap' }}>
+        <div>
+          <span className="eyebrow">{group.clusterId ? 'Cluster' : 'Unreachable / Unknown'}</span>
+          <h2 style={{ margin: 0, fontSize: '1rem', fontFamily: 'monospace', letterSpacing: '-0.01em' }}>
+            {group.clusterId ?? '—'}
+          </h2>
+        </div>
+        <span style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>
+          {reachable} / {total} brokers reachable
+        </span>
+      </div>
+
+      <div
+        className="content-grid"
+        style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}
+      >
+        {group.brokers.map((sample) => (
+          <BrokerMetricsCard key={sample.targetId} sample={sample} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────
 
-export default function ClusterMetricsPage() {
-  const { clusterId } = useParams<{ clusterId: string }>()
-  const navigate = useNavigate()
-  const { clusters } = useOutletContext<DashboardContext>()
+export default function MetricsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [targets, setTargets] = useState<MetricsTargetResponse[]>([])
-  const [scrapeResult, setScrapeResult] = useState<ClusterMetricsScrapeResponse | null>(null)
+  const [targets, setTargets] = useState<import('../types/api').MetricsTargetResponse[]>([])
+  const [scrapeResult, setScrapeResult] = useState<MetricsScrapeResponse | null>(null)
   const [uploading, setUploading] = useState(false)
   const [scraping, setScraping] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const cluster = clusters.find((c) => c.clusterId === clusterId)
-
   useEffect(() => {
-    if (clusterId) void loadTargets()
-  }, [clusterId])
+    void loadTargets()
+  }, [])
 
   async function loadTargets() {
     try {
-      const result = await apiClient.listMetricsTargets(clusterId!)
+      const result = await apiClient.listMetricsTargets()
       setTargets(result)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load targets')
@@ -222,14 +247,14 @@ export default function ClusterMetricsPage() {
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file || !clusterId) return
+    if (!file) return
 
     setUploading(true)
     setError(null)
     try {
-      const result = await apiClient.uploadMetricsInventory(clusterId, file)
+      const result = await apiClient.uploadMetricsInventory(file)
       setTargets(result)
-      setScrapeResult(null) // stale results after new inventory
+      setScrapeResult(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
@@ -239,9 +264,8 @@ export default function ClusterMetricsPage() {
   }
 
   async function handleDeleteTarget(targetId: string) {
-    if (!clusterId) return
     try {
-      await apiClient.deleteMetricsTarget(clusterId, targetId)
+      await apiClient.deleteMetricsTarget(targetId)
       setTargets((prev) => prev.filter((t) => t.targetId !== targetId))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed')
@@ -249,11 +273,10 @@ export default function ClusterMetricsPage() {
   }
 
   async function handleScrape() {
-    if (!clusterId) return
     setScraping(true)
     setError(null)
     try {
-      const result = await apiClient.scrapeClusterMetrics(clusterId)
+      const result = await apiClient.scrapeMetrics()
       setScrapeResult(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Scrape failed')
@@ -262,18 +285,24 @@ export default function ClusterMetricsPage() {
     }
   }
 
-  const reachableCount = scrapeResult?.targets.filter((t) => t.reachable).length ?? 0
-  const totalCount = scrapeResult?.targets.length ?? 0
+  const totalBrokers = scrapeResult?.clusters.reduce((acc, c) => acc + c.brokers.length, 0) ?? 0
+  const reachableBrokers = scrapeResult?.clusters.reduce(
+    (acc, c) => acc + c.brokers.filter((b) => b.reachable).length,
+    0,
+  ) ?? 0
+  const discoveredClusterCount = scrapeResult?.clusters.filter((c) => c.clusterId !== null).length ?? 0
 
   return (
     <>
       <header className="hero">
         <div className="hero__content">
           <span className="eyebrow">Metrics</span>
-          <h1>{cluster?.clusterName ?? 'Cluster'} — JMX Metrics</h1>
+          <h1>JMX Metrics</h1>
           <p>
-            Scrape Confluent Platform 7.9 broker metrics via the Prometheus JMX exporter (port 9404).
-            Upload an inventory CSV, then click <strong>Scrape Now</strong> to pull fresh metrics.
+            Upload a broker inventory CSV, then click <strong>Scrape Now</strong>. Each broker's
+            cluster ID is read automatically from the{' '}
+            <code>kafka_server_KafkaServer_ClusterId</code> JMX metric — no manual cluster
+            registration required.
           </p>
         </div>
         <div className="hero__actions">
@@ -285,13 +314,6 @@ export default function ClusterMetricsPage() {
           >
             {scraping ? 'Scraping…' : 'Scrape Now'}
           </button>
-          <button
-            className="secondary-button"
-            type="button"
-            onClick={() => void navigate(`/clusters/${clusterId}`)}
-          >
-            Back to health
-          </button>
         </div>
       </header>
 
@@ -302,7 +324,7 @@ export default function ClusterMetricsPage() {
         <div className="panel__header">
           <div>
             <span className="eyebrow">Inventory</span>
-            <h2>Metrics targets ({targets.length})</h2>
+            <h2>Broker targets ({targets.length})</h2>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <input
@@ -374,11 +396,11 @@ export default function ClusterMetricsPage() {
       {/* ── Scrape results ──────────────────────────────────────── */}
       {scrapeResult && (
         <section>
-          <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'baseline', gap: '1rem' }}>
+          <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'baseline', gap: '1.5rem', flexWrap: 'wrap' }}>
             <div>
               <span className="eyebrow">Scrape results</span>
               <h2 style={{ margin: 0 }}>
-                {reachableCount} / {totalCount} reachable
+                {discoveredClusterCount} cluster{discoveredClusterCount !== 1 ? 's' : ''} · {reachableBrokers} / {totalBrokers} brokers reachable
               </h2>
             </div>
             <small style={{ color: 'var(--color-muted)' }}>
@@ -386,14 +408,9 @@ export default function ClusterMetricsPage() {
             </small>
           </div>
 
-          <div
-            className="content-grid"
-            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}
-          >
-            {scrapeResult.targets.map((sample) => (
-              <BrokerMetricsCard key={sample.targetId} sample={sample} />
-            ))}
-          </div>
+          {scrapeResult.clusters.map((group, i) => (
+            <ClusterSection key={group.clusterId ?? `unknown-${i}`} group={group} />
+          ))}
         </section>
       )}
     </>

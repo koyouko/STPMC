@@ -47,7 +47,7 @@ class SecurityConfigIntegrationTests {
     void metricsEndpointAccessibleInDevMode() throws Exception {
         // Metrics scrape endpoint is accessible for authenticated users in dev mode
         // Returns 200 with empty target list (no targets configured)
-        mockMvc.perform(get("/api/platform/clusters/00000000-0000-0000-0000-000000000001/metrics/targets"))
+        mockMvc.perform(get("/api/platform/metrics/targets"))
                 .andExpect(status().isOk());
     }
 

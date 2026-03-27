@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/api/platform/clusters/{clusterId}/metrics")
+@RequestMapping("/api/platform/metrics")
 public class MetricsController {
 
     private final MetricsScraperService metricsScraperService;
@@ -35,28 +35,27 @@ public class MetricsController {
     }
 
     /**
-     * Upload a CSV inventory file to replace all metrics targets for this cluster.
+     * Upload a CSV inventory file to replace the entire global target list.
      * Format: host, port (optional, default 9404), role (optional), label (optional)
      * Lines starting with '#' are treated as comments.
      */
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'OPERATOR')")
     @PostMapping("/targets/upload")
     public List<ApiDtos.MetricsTargetResponse> uploadInventory(
-            @PathVariable UUID clusterId,
             @RequestParam("file") MultipartFile file) throws IOException {
 
         if (file.isEmpty()) {
             throw new IllegalArgumentException("Uploaded file is empty");
         }
 
-        List<MetricsTarget> targets = metricsScraperService.uploadInventory(clusterId, file);
+        List<MetricsTarget> targets = metricsScraperService.uploadInventory(file);
         return targets.stream().map(this::toResponse).toList();
     }
 
-    /** List all enabled metrics targets for this cluster. */
+    /** List all enabled metrics targets. */
     @GetMapping("/targets")
-    public List<ApiDtos.MetricsTargetResponse> listTargets(@PathVariable UUID clusterId) {
-        return metricsTargetRepository.findByClusterIdAndEnabledTrue(clusterId)
+    public List<ApiDtos.MetricsTargetResponse> listTargets() {
+        return metricsTargetRepository.findByEnabledTrue()
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -66,22 +65,17 @@ public class MetricsController {
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'OPERATOR')")
     @DeleteMapping("/targets/{targetId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteTarget(@PathVariable UUID clusterId, @PathVariable UUID targetId) {
-        metricsTargetRepository.findById(targetId).ifPresent(target -> {
-            if (!target.getClusterId().equals(clusterId)) {
-                throw new IllegalArgumentException("Target does not belong to this cluster");
-            }
-            metricsTargetRepository.deleteById(targetId);
-        });
+    public void deleteTarget(@PathVariable UUID targetId) {
+        metricsTargetRepository.deleteById(targetId);
     }
 
     /**
-     * On-demand scrape: fetch fresh metrics from all configured targets and return them.
-     * Each target is scraped sequentially; unreachable targets are included with reachable=false.
+     * On-demand scrape: fetch fresh metrics from all configured targets, extract cluster IDs
+     * from JMX, and return results grouped by discovered cluster UUID.
      */
     @GetMapping("/scrape")
-    public ApiDtos.ClusterMetricsScrapeResponse scrapeCluster(@PathVariable UUID clusterId) {
-        return metricsScraperService.scrapeCluster(clusterId);
+    public ApiDtos.MetricsScrapeResponse scrapeAll() {
+        return metricsScraperService.scrapeAll();
     }
 
     private ApiDtos.MetricsTargetResponse toResponse(MetricsTarget target) {

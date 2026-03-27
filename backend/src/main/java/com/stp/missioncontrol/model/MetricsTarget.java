@@ -15,9 +15,6 @@ public class MetricsTarget {
     @Id
     private UUID id;
 
-    @Column(name = "cluster_id", nullable = false)
-    private UUID clusterId;
-
     @Column(nullable = false)
     private String host;
 
@@ -53,9 +50,6 @@ public class MetricsTarget {
     }
 
     public UUID getId() { return id; }
-
-    public UUID getClusterId() { return clusterId; }
-    public void setClusterId(UUID clusterId) { this.clusterId = clusterId; }
 
     public String getHost() { return host; }
     public void setHost(String host) { this.host = host; }

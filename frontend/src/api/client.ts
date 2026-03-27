@@ -4,11 +4,11 @@ import type {
   ClusterConfigResponse,
   ClusterHealthDetailResponse,
   ClusterHealthSummaryResponse,
-  ClusterMetricsScrapeResponse,
   CreateClusterRequest,
   CreateServiceAccountRequest,
   CreateServiceAccountTokenRequest,
   MetricsTargetResponse,
+  MetricsScrapeResponse,
   RefreshOperationResponse,
   ServiceAccountResponse,
   ServiceAccountTokenResponse,
@@ -113,11 +113,10 @@ export const apiClient = {
   // ── Metrics ───────────────────────────────────────────────────────
 
   /**
-   * Upload a CSV inventory file to set the metrics targets for a cluster.
-   * Replaces all existing targets.
+   * Upload a CSV inventory file to replace the entire global metrics target list.
    * Format: host, port (optional), role (optional), label (optional)
    */
-  uploadMetricsInventory(clusterId: string, file: File) {
+  uploadMetricsInventory(file: File) {
     const formData = new FormData()
     formData.append('file', file)
     // Omit Content-Type to let the browser set multipart/form-data with boundary
@@ -125,27 +124,27 @@ export const apiClient = {
       ? { 'X-MC-User': 'frontend-operator' }
       : {}
     return request<MetricsTargetResponse[]>(
-      `/api/platform/clusters/${clusterId}/metrics/targets/upload`,
+      '/api/platform/metrics/targets/upload',
       { method: 'POST', body: formData, headers },
     )
   },
 
-  listMetricsTargets(clusterId: string) {
-    return request<MetricsTargetResponse[]>(`/api/platform/clusters/${clusterId}/metrics/targets`)
+  listMetricsTargets() {
+    return request<MetricsTargetResponse[]>('/api/platform/metrics/targets')
   },
 
-  deleteMetricsTarget(clusterId: string, targetId: string) {
-    return request<void>(`/api/platform/clusters/${clusterId}/metrics/targets/${targetId}`, {
+  deleteMetricsTarget(targetId: string) {
+    return request<void>(`/api/platform/metrics/targets/${targetId}`, {
       method: 'DELETE',
     })
   },
 
   /**
-   * Trigger an on-demand scrape of all configured JMX exporter endpoints for the cluster.
-   * Returns fresh metrics for each target.
+   * Trigger an on-demand scrape of all configured JMX targets. Brokers are auto-grouped
+   * by the cluster ID discovered from the kafka_server_KafkaServer_ClusterId JMX metric.
    */
-  scrapeClusterMetrics(clusterId: string) {
-    return request<ClusterMetricsScrapeResponse>(`/api/platform/clusters/${clusterId}/metrics/scrape`)
+  scrapeMetrics() {
+    return request<MetricsScrapeResponse>('/api/platform/metrics/scrape')
   },
 
   // ── Audit ──────────────────────────────────────────────────────────
@@ -157,5 +156,5 @@ export const apiClient = {
   },
 }
 
-// Re-export BrokerMetricsSample so pages don't need a separate import
-export type { BrokerMetricsSample }
+// Re-export metrics types so pages don't need a separate import
+export type { BrokerMetricsSample, MetricsScrapeResponse }

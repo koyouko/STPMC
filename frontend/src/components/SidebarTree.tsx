@@ -10,7 +10,7 @@ interface SidebarTreeProps {
   onSelectEnvironment: (environment: ClusterEnvironment) => void
   onSelectCluster: (clusterId: string, environment: ClusterEnvironment) => void
   onSelectComponent: (clusterId: string, componentKind: string, environment: ClusterEnvironment) => void
-  onMetrics?: (clusterId: string) => void
+  onMetrics?: () => void
   onAuditLog?: () => void
 }
 
@@ -39,6 +39,17 @@ export function SidebarTree({
         <small>All clusters</small>
       </button>
 
+
+      {onMetrics && (
+        <button
+          type="button"
+          className="sidebar-overview-button"
+          onClick={onMetrics}
+        >
+          <span>JMX Metrics</span>
+          <small>Broker telemetry</small>
+        </button>
+      )}
 
       {onAuditLog && (
         <button
@@ -100,15 +111,6 @@ export function SidebarTree({
                               <span className={`tree-component__dot tree-component__dot--${component.status.toLowerCase()}`} />
                             </button>
                           ))}
-                          {onMetrics && (
-                            <button
-                              type="button"
-                              className="tree-component__button"
-                              onClick={() => onMetrics(cluster.clusterId)}
-                            >
-                              <span>JMX Metrics</span>
-                            </button>
-                          )}
                         </div>
                       ) : null}
                     </div>

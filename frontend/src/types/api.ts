@@ -198,6 +198,7 @@ export interface MetricsTargetResponse {
 /**
  * Metrics scraped from a single Prometheus JMX exporter endpoint (port 9404).
  * Fields are -1 when the target was unreachable or the metric was not present.
+ * discoveredClusterId is read from kafka_server_KafkaServer_ClusterId JMX label.
  */
 export interface BrokerMetricsSample {
   targetId: string
@@ -205,6 +206,7 @@ export interface BrokerMetricsSample {
   metricsPort: number
   role: string
   label: string
+  discoveredClusterId: string | null
   reachable: boolean
   errorMessage: string | null
   scrapedAt: string
@@ -225,10 +227,16 @@ export interface BrokerMetricsSample {
   heapMaxBytes: number
 }
 
-export interface ClusterMetricsScrapeResponse {
-  clusterId: string
+/** A Kafka cluster auto-discovered by grouping brokers with the same cluster ID from JMX. */
+export interface DiscoveredCluster {
+  clusterId: string | null
+  brokers: BrokerMetricsSample[]
+}
+
+/** Top-level response for a global on-demand scrape. */
+export interface MetricsScrapeResponse {
   scrapedAt: string
-  targets: BrokerMetricsSample[]
+  clusters: DiscoveredCluster[]
 }
 
 // ── Audit Types ──────────────────────────────────────────────────

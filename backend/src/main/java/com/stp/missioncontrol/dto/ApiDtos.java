@@ -268,21 +268,8 @@ public final class ApiDtos {
     /**
      * Metrics scraped from a single target's Prometheus JMX exporter endpoint.
      * Fields are -1.0 when the target was unreachable or the metric was not present.
-     *
-     * <p>Key Confluent Platform 7.9 metrics:
-     * <ul>
-     *   <li>messagesInPerSec – all-topics 1-min rate</li>
-     *   <li>bytesInPerSec / bytesOutPerSec – all-topics 1-min rates</li>
-     *   <li>underReplicatedPartitions – should be 0 in a healthy cluster</li>
-     *   <li>activeControllerCount – should be 1 on the elected controller, 0 on others</li>
-     *   <li>offlinePartitionsCount – should be 0</li>
-     *   <li>brokerState – 3 = running (see KafkaServer.BrokerState)</li>
-     *   <li>leaderCount / partitionCount – per-broker partition leadership</li>
-     *   <li>isrShrinksPerSec – ISR shrink rate; elevated value indicates instability</li>
-     *   <li>isrExpandsPerSec – ISR expand rate</li>
-     *   <li>requestHandlerIdle – request handler pool idle ratio (0..1); low = overloaded</li>
-     *   <li>heapUsedBytes / heapMaxBytes – JVM heap from jvm_memory_bytes_used/max{area="heap"}</li>
-     * </ul>
+     * {@code discoveredClusterId} is read from the {@code kafka_server_KafkaServer_ClusterId}
+     * JMX metric label — null when the target is unreachable or not a Kafka broker.
      */
     public record BrokerMetricsSample(
             UUID targetId,
@@ -290,6 +277,7 @@ public final class ApiDtos {
             int metricsPort,
             String role,
             String label,
+            String discoveredClusterId,
             boolean reachable,
             String errorMessage,
             Instant scrapedAt,
@@ -311,10 +299,21 @@ public final class ApiDtos {
     ) {
     }
 
-    public record ClusterMetricsScrapeResponse(
-            UUID clusterId,
+    /**
+     * A Kafka cluster discovered by grouping brokers that returned the same
+     * {@code kafka_server_KafkaServer_ClusterId} label from their JMX scrape.
+     * {@code clusterId} is null for unreachable or non-Kafka targets.
+     */
+    public record DiscoveredCluster(
+            String clusterId,
+            List<BrokerMetricsSample> brokers
+    ) {
+    }
+
+    /** Top-level response for an on-demand global scrape. */
+    public record MetricsScrapeResponse(
             Instant scrapedAt,
-            List<BrokerMetricsSample> targets
+            List<DiscoveredCluster> clusters
     ) {
     }
 }
