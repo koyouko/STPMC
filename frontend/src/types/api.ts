@@ -183,193 +183,52 @@ export interface TestConnectionResponse {
   errorMessage: string | null
 }
 
-// ── Self-Service Types ────────────────────────────────────────────
+// ── Metrics Types ─────────────────────────────────────────────────
 
-export type SelfServiceTaskType =
-  | 'TOPIC_LIST' | 'TOPIC_DESCRIBE' | 'TOPIC_CREATE' | 'TOPIC_DELETE'
-  | 'TOPIC_PURGE' | 'TOPIC_INCREASE_PARTITIONS' | 'TOPIC_MESSAGE_COUNT'
-  | 'TOPIC_CONFIG_DESCRIBE' | 'TOPIC_CONFIG_ALTER'
-  | 'ACL_LIST' | 'ACL_DESCRIBE' | 'ACL_GRANT' | 'ACL_REMOVE'
-  | 'CONSUMER_GROUP_LIST' | 'CONSUMER_GROUP_DESCRIBE' | 'CONSUMER_GROUP_DELETE' | 'CONSUMER_GROUP_OFFSETS'
-  | 'TOPIC_DATA_DUMP'
-
-export type SelfServiceCategory = 'TOPIC' | 'ACL' | 'CONSUMER_GROUP' | 'DATA'
-
-export interface TaskCatalogEntry {
-  taskType: SelfServiceTaskType
-  category: SelfServiceCategory
-  displayName: string
-  description: string
-  readOnly: boolean
-}
-
-export interface TopicSummary {
-  name: string
-  internal: boolean
-  partitions: number
-}
-
-export interface TopicListResponse {
-  clusterId: string
-  topics: TopicSummary[]
-}
-
-export interface TopicPartitionInfo {
-  partition: number
-  leader: number
-  replicas: number[]
-  isr: number[]
-}
-
-export interface TopicDescribeResponse {
-  clusterId: string
-  topicName: string
-  partitions: number
-  replicationFactor: number
-  partitionInfos: TopicPartitionInfo[]
-  configs: Record<string, string>
-}
-
-export interface CreateTopicResponse {
-  clusterId: string
-  topicName: string
-  message: string
-}
-
-export interface DeleteTopicResponse {
-  clusterId: string
-  topicName: string
-  message: string
-}
-
-export interface TopicPurgeResponse {
-  clusterId: string
-  topicName: string
-  message: string
-}
-
-export interface IncreasePartitionsResponse {
-  clusterId: string
-  topicName: string
-  previousCount: number
-  newCount: number
-}
-
-export interface MessageCountResponse {
-  clusterId: string
-  topicName: string
-  partitionCounts: Record<number, number>
-  totalCount: number
-}
-
-export interface TopicConfigEntry {
-  name: string
-  value: string
-  source: string
-  isDefault: boolean
-  isSensitive: boolean
-  isReadOnly: boolean
-}
-
-export interface TopicConfigDescribeResponse {
-  clusterId: string
-  topicName: string
-  configs: TopicConfigEntry[]
-}
-
-export interface TopicConfigAlterResponse {
-  clusterId: string
-  topicName: string
-  message: string
-  updatedConfigs: Record<string, string>
-}
-
-export interface AclEntry {
-  resourceType: string
-  resourceName: string
-  patternType: string
-  principal: string
+export interface MetricsTargetResponse {
+  targetId: string
   host: string
-  operation: string
-  permission: string
+  metricsPort: number
+  role: string
+  label: string
+  enabled: boolean
+  createdAt: string
 }
 
-export interface AclListResponse {
-  clusterId: string
-  acls: AclEntry[]
-}
-
-export interface AclOperationResponse {
-  clusterId: string
-  message: string
-  affectedCount: number
-}
-
-export interface ConsumerGroupSummary {
-  groupId: string
-  state: string
-  type: string
-}
-
-export interface ConsumerGroupListResponse {
-  clusterId: string
-  groups: ConsumerGroupSummary[]
-}
-
-export interface TopicPartitionAssignment {
-  topic: string
-  partition: number
-}
-
-export interface ConsumerGroupMemberInfo {
-  memberId: string
-  clientId: string
+/**
+ * Metrics scraped from a single Prometheus JMX exporter endpoint (port 9404).
+ * Fields are -1 when the target was unreachable or the metric was not present.
+ */
+export interface BrokerMetricsSample {
+  targetId: string
   host: string
-  assignments: TopicPartitionAssignment[]
+  metricsPort: number
+  role: string
+  label: string
+  reachable: boolean
+  errorMessage: string | null
+  scrapedAt: string
+  latencyMs: number
+  messagesInPerSec: number
+  bytesInPerSec: number
+  bytesOutPerSec: number
+  underReplicatedPartitions: number
+  activeControllerCount: number
+  offlinePartitionsCount: number
+  brokerState: number
+  leaderCount: number
+  partitionCount: number
+  isrShrinksPerSec: number
+  isrExpandsPerSec: number
+  requestHandlerIdle: number
+  heapUsedBytes: number
+  heapMaxBytes: number
 }
 
-export interface ConsumerGroupOffsetInfo {
-  topic: string
-  partition: number
-  currentOffset: number
-  logEndOffset: number
-  lag: number
-}
-
-export interface ConsumerGroupDescribeResponse {
+export interface ClusterMetricsScrapeResponse {
   clusterId: string
-  groupId: string
-  state: string
-  coordinator: string
-  members: ConsumerGroupMemberInfo[]
-  offsets: ConsumerGroupOffsetInfo[]
-}
-
-export interface ConsumerGroupDeleteResponse {
-  clusterId: string
-  groupId: string
-  message: string
-}
-
-export interface OffsetResetResponse {
-  clusterId: string
-  groupId: string
-  updatedOffsets: Record<string, Record<number, number>>
-}
-
-export interface DumpedMessage {
-  partition: number
-  offset: number
-  key: string | null
-  value: string | null
-  timestamp: number
-  headers: Record<string, string>
-}
-
-export interface TopicDataDumpResponse {
-  clusterId: string
-  topicName: string
-  messages: DumpedMessage[]
+  scrapedAt: string
+  targets: BrokerMetricsSample[]
 }
 
 // ── Audit Types ──────────────────────────────────────────────────
@@ -389,26 +248,4 @@ export interface AuditPageResponse {
   totalElements: number
   totalPages: number
   currentPage: number
-}
-
-// ── Schema Registry Types ────────────────────────────────────────
-
-export interface SchemaSubjectListResponse {
-  clusterId: string
-  subjects: string[]
-}
-
-export interface SchemaSubjectVersionsResponse {
-  clusterId: string
-  subject: string
-  versions: number[]
-}
-
-export interface SchemaResponse {
-  clusterId: string
-  subject: string
-  version: number
-  id: number
-  schemaType: string
-  schema: string
 }

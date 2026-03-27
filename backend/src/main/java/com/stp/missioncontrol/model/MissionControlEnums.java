@@ -71,38 +71,4 @@ public final class MissionControlEnums {
         API
     }
 
-    public enum SelfServiceTaskType {
-        TOPIC_LIST,
-        TOPIC_DESCRIBE,
-        TOPIC_CREATE,
-        TOPIC_DELETE,
-        TOPIC_PURGE,
-        TOPIC_INCREASE_PARTITIONS,
-        TOPIC_MESSAGE_COUNT,
-        TOPIC_CONFIG_DESCRIBE,
-        TOPIC_CONFIG_ALTER,
-        ACL_LIST,
-        ACL_DESCRIBE,
-        ACL_GRANT,
-        ACL_REMOVE,
-        CONSUMER_GROUP_LIST,
-        CONSUMER_GROUP_DESCRIBE,
-        CONSUMER_GROUP_DELETE,
-        CONSUMER_GROUP_OFFSETS,
-        TOPIC_DATA_DUMP
-    }
-
-    public enum SelfServiceCategory {
-        TOPIC,
-        ACL,
-        CONSUMER_GROUP,
-        DATA
-    }
-
-    public enum TaskExecutionStatus {
-        QUEUED,
-        RUNNING,
-        SUCCESS,
-        FAILED
-    }
 }

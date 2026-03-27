@@ -122,14 +122,14 @@ export function AppLayout() {
             onSelectEnvironment={handleSelectEnvironment}
             onSelectCluster={handleSelectCluster}
             onSelectComponent={handleSelectComponent}
-            onSelfService={() => void navigate('/self-service')}
+            onMetrics={(clusterId) => void navigate(`/clusters/${clusterId}/metrics`)}
             onAuditLog={() => void navigate('/audit')}
           />
         </div>
 
         <section className="sidebar-note">
           <span className="eyebrow">Mission</span>
-          <p>Onboard existing Kafka clusters, observe service health, and expose a stable external health API.</p>
+          <p>Onboard Kafka clusters, observe health, scrape JMX metrics, and expose a stable external health API.</p>
         </section>
       </aside>
 

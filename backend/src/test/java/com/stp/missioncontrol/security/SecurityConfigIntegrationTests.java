@@ -7,7 +7,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -45,13 +44,11 @@ class SecurityConfigIntegrationTests {
     }
 
     @Test
-    void dataDumpReturns400ForMissingClusterNotForbidden() throws Exception {
-        // Data dump requires PLATFORM_ADMIN — dev mode grants it, so the request
-        // should fail with 400 (cluster not found), NOT 403 (forbidden).
-        mockMvc.perform(post("/api/platform/self-service/00000000-0000-0000-0000-000000000001/topics/data-dump")
-                        .contentType("application/json")
-                        .content("{\"topicName\":\"test\",\"maxMessages\":10}"))
-                .andExpect(status().isBadRequest()); // 400, not 403
+    void metricsEndpointAccessibleInDevMode() throws Exception {
+        // Metrics scrape endpoint is accessible for authenticated users in dev mode
+        // Returns 200 with empty target list (no targets configured)
+        mockMvc.perform(get("/api/platform/clusters/00000000-0000-0000-0000-000000000001/metrics/targets"))
+                .andExpect(status().isOk());
     }
 
     @Test

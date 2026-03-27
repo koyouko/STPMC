@@ -1,7 +1,64 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { apiClient } from '../api/client'
 import type { AuditEventResponse, AuditPageResponse } from '../types/api'
-import { SearchBar, DataTable, type ColumnDef } from '../components/SelfServiceUI'
+
+interface ColumnDef<T> {
+  key: keyof T | string
+  label: string
+  sortable?: boolean
+  render?: (row: T) => React.ReactNode
+}
+
+function SearchBar({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <input
+      type="search"
+      className="search-input"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+    />
+  )
+}
+
+function DataTable<T>({
+  columns,
+  data,
+  loading,
+  emptyMessage,
+  rowKey,
+}: {
+  columns: ColumnDef<T>[]
+  data: T[]
+  loading?: boolean
+  emptyMessage?: string
+  rowKey: (row: T) => string
+}) {
+  if (loading) return <div className="loading-card">Loading…</div>
+  if (data.length === 0) return <div className="loading-card">{emptyMessage ?? 'No data.'}</div>
+  return (
+    <table className="data-table" style={{ width: '100%' }}>
+      <thead>
+        <tr>
+          {columns.map((col) => (
+            <th key={String(col.key)}>{col.label}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {data.map((row) => (
+          <tr key={rowKey(row)}>
+            {columns.map((col) => (
+              <td key={String(col.key)}>
+                {col.render ? col.render(row) : String(row[col.key as keyof T] ?? '')}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
 
 export default function AuditLogPage() {
   const [data, setData] = useState<AuditPageResponse | null>(null)
@@ -117,7 +174,7 @@ export default function AuditLogPage() {
       <span className="eyebrow">Administration</span>
       <h1>Audit Log</h1>
       <p className="page-subtitle">
-        Track all platform operations — cluster changes, self-service tasks, and service account activity.
+        Track all platform operations — cluster changes, metric scrapes, and service account activity.
       </p>
 
       <div className="audit-filters">
