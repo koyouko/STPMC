@@ -60,6 +60,24 @@ function DataTable<T>({
   )
 }
 
+function getActionBadgeClass(action: string): string {
+  const lower = action.toLowerCase()
+  if (lower.includes('created') || lower.includes('granted')) return 'audit-action-badge--create'
+  if (lower.includes('deleted') || lower.includes('removed') || lower.includes('deactivated')) return 'audit-action-badge--delete'
+  if (lower.includes('revoked')) return 'audit-action-badge--revoke'
+  if (lower.includes('updated') || lower.includes('altered') || lower.includes('reset') || lower.includes('purged') || lower.includes('increased')) return 'audit-action-badge--update'
+  if (lower.includes('refresh') || lower.includes('used')) return 'audit-action-badge--refresh'
+  return ''
+}
+
+function formatTimestamp(ts: string) {
+  const d = new Date(ts)
+  return d.toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  })
+}
+
 export default function AuditLogPage() {
   const [data, setData] = useState<AuditPageResponse | null>(null)
   const [page, setPage] = useState(0)
@@ -68,9 +86,12 @@ export default function AuditLogPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Debounce search
+  // Debounce search and reset page together to avoid double-fetch
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 350)
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(0)
+    }, 350)
     return () => clearTimeout(timer)
   }, [search])
 
@@ -90,29 +111,6 @@ export default function AuditLogPage() {
   useEffect(() => {
     loadEvents()
   }, [loadEvents])
-
-  // Reset to page 0 when search changes
-  useEffect(() => {
-    setPage(0)
-  }, [debouncedSearch])
-
-  const getActionBadgeClass = (action: string): string => {
-    const lower = action.toLowerCase()
-    if (lower.includes('created') || lower.includes('granted')) return 'audit-action-badge--create'
-    if (lower.includes('deleted') || lower.includes('removed') || lower.includes('deactivated')) return 'audit-action-badge--delete'
-    if (lower.includes('revoked')) return 'audit-action-badge--revoke'
-    if (lower.includes('updated') || lower.includes('altered') || lower.includes('reset') || lower.includes('purged') || lower.includes('increased')) return 'audit-action-badge--update'
-    if (lower.includes('refresh') || lower.includes('used')) return 'audit-action-badge--refresh'
-    return ''
-  }
-
-  const formatTimestamp = (ts: string) => {
-    const d = new Date(ts)
-    return d.toLocaleString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-    })
-  }
 
   const columns: ColumnDef<AuditEventResponse>[] = useMemo(() => [
     {

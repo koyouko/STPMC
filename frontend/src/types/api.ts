@@ -187,10 +187,12 @@ export interface TestConnectionResponse {
 
 export interface MetricsTargetResponse {
   targetId: string
+  clusterName: string | null
+  discoveredClusterId: string | null
   host: string
   metricsPort: number
   role: string
-  label: string
+  environment: string | null
   enabled: boolean
   createdAt: string
 }
@@ -205,7 +207,6 @@ export interface BrokerMetricsSample {
   host: string
   metricsPort: number
   role: string
-  label: string
   discoveredClusterId: string | null
   reachable: boolean
   errorMessage: string | null

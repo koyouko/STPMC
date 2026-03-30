@@ -1,35 +1,44 @@
 services:
   # ── PostgreSQL (LenseIQ persistence) ────────────────────────────
   postgres:
-    image: postgres:16
-    container_name: stp-mission-control-postgres
+    image: postgres:17-alpine
+    restart: unless-stopped
+    container_name: lenseiq-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-mission_control}
       POSTGRES_USER: ${POSTGRES_USER:-mission_control}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mission_control}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mission_control}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - mission-control-postgres:/var/lib/postgresql/data
 
-  # ── Confluent Platform 7.9 — single-node KRaft broker ───────────
+  # ── Confluent Kafka (KRaft + JMX Prometheus exporter) ───────────
+  # JMX metrics:   http://localhost:4000/metrics
+  # Kafka bootstrap: localhost:9092
   kafka:
-    image: confluentinc/cp-kafka:7.9.0
-    container_name: confluent-kafka
+    image: confluentinc/cp-kafka:7.8.0
+    restart: unless-stopped
+    container_name: lenseiq-kafka
     hostname: kafka
     environment:
       # KRaft — no ZooKeeper required
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
       KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qg==   # fixed UUID for repeatable dev env
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
 
-      # Listeners
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Listeners — PLAINTEXT_HOST is accessible from the Docker host
+      KAFKA_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
 
       # Single-node defaults
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -39,38 +48,27 @@ services:
       KAFKA_MIN_INSYNC_REPLICAS: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
 
-      # JMX — expose on port 9999 so the jmx-exporter sidecar can connect
-      KAFKA_JMX_PORT: 9999
-      KAFKA_JMX_HOSTNAME: kafka
-      KAFKA_JMX_OPTS: >-
-        -Dcom.sun.jndi.rmiregistry.disableAnonBind=true
-        -Djava.rmi.server.hostname=kafka
+      # JMX exporter agent — exposes Prometheus /metrics on container port 4000
+      KAFKA_OPTS: "-javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent.jar=4000:/opt/jmx-exporter/kafka-config.yml"
+      KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseG1GC -XX:MaxGCPauseMillis=20"
+      KAFKA_HEAP_OPTS: "-Xmx1G -Xms512m"
 
     ports:
-      - "9092:9092"    # Kafka bootstrap (for LenseIQ health checks)
-      - "9999:9999"    # JMX (debug access from host; exporter uses internal network)
+      - "127.0.0.1:9092:9092"    # Kafka bootstrap (LenseIQ health checks / producers)
+      - "127.0.0.1:4000:4000"    # Prometheus JMX metrics  →  http://localhost:4000/metrics
+
+    volumes:
+      - ./config/jmx_prometheus_javaagent-1.0.1.jar:/opt/jmx-exporter/jmx_prometheus_javaagent.jar:ro
+      - ./config/jmx-exporter.yml:/opt/jmx-exporter/kafka-config.yml:ro
+      - kafka-data:/var/lib/kafka/data
+
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
-      interval: 15s
+      interval: 30s
       timeout: 10s
-      retries: 10
-      start_period: 30s
-
-  # ── Prometheus JMX Exporter — exposes Kafka JMX as HTTP /metrics ─
-  # Access at http://localhost:4000/metrics
-  jmx-exporter:
-    image: prom/jmx-exporter:latest
-    container_name: kafka-jmx-exporter
-    command:
-      - "5556"                          # internal HTTP port
-      - /etc/jmx-exporter/config.yml
-    ports:
-      - "4000:5556"                     # host:container → localhost:4000/metrics
-    volumes:
-      - ./config/jmx-exporter.yml:/etc/jmx-exporter/config.yml:ro
-    depends_on:
-      kafka:
-        condition: service_healthy
+      retries: 5
+      start_period: 45s
 
 volumes:
   mission-control-postgres:
+  kafka-data:

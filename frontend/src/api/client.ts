@@ -31,12 +31,17 @@ const defaultHeaders: Record<string, string> = {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData = init?.body instanceof FormData
+  const headers: Record<string, string> = {
+    ...defaultHeaders,
+    ...(init?.headers as Record<string, string> ?? {}),
+  }
+  // Let the browser set Content-Type with boundary for FormData
+  if (isFormData) delete headers['Content-Type']
+
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: {
-      ...defaultHeaders,
-      ...(init?.headers ?? {}),
-    },
+    headers,
   })
 
   if (!response.ok) {
@@ -48,7 +53,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     return undefined as T
   }
 
-  return response.json() as Promise<T>
+  const text = await response.text()
+  if (!text) return undefined as T
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error(`Expected JSON response but received unexpected format`)
+  }
 }
 
 export const apiClient = {
@@ -58,15 +69,15 @@ export const apiClient = {
     return request<ClusterHealthSummaryResponse[]>('/api/platform/clusters')
   },
   getClusterHealth(clusterId: string) {
-    return request<ClusterHealthDetailResponse>(`/api/platform/clusters/${clusterId}/health`)
+    return request<ClusterHealthDetailResponse>(`/api/platform/clusters/${encodeURIComponent(clusterId)}/health`)
   },
   refreshClusterHealth(clusterId: string) {
-    return request<RefreshOperationResponse>(`/api/platform/clusters/${clusterId}/health/refresh`, {
+    return request<RefreshOperationResponse>(`/api/platform/clusters/${encodeURIComponent(clusterId)}/health/refresh`, {
       method: 'POST',
     })
   },
   getClusterConfig(clusterId: string) {
-    return request<ClusterConfigResponse>(`/api/platform/clusters/${clusterId}/config`)
+    return request<ClusterConfigResponse>(`/api/platform/clusters/${encodeURIComponent(clusterId)}/config`)
   },
   createCluster(payload: CreateClusterRequest) {
     return request<ClusterHealthDetailResponse>('/api/platform/clusters', {
@@ -75,13 +86,13 @@ export const apiClient = {
     })
   },
   updateCluster(clusterId: string, payload: UpdateClusterRequest) {
-    return request<ClusterHealthDetailResponse>(`/api/platform/clusters/${clusterId}`, {
+    return request<ClusterHealthDetailResponse>(`/api/platform/clusters/${encodeURIComponent(clusterId)}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     })
   },
   deleteCluster(clusterId: string) {
-    return request<void>(`/api/platform/clusters/${clusterId}`, {
+    return request<void>(`/api/platform/clusters/${encodeURIComponent(clusterId)}`, {
       method: 'DELETE',
     })
   },
@@ -104,7 +115,7 @@ export const apiClient = {
     })
   },
   createServiceAccountToken(serviceAccountId: string, payload: CreateServiceAccountTokenRequest) {
-    return request<ServiceAccountTokenResponse>(`/api/admin/service-accounts/${serviceAccountId}/tokens`, {
+    return request<ServiceAccountTokenResponse>(`/api/admin/service-accounts/${encodeURIComponent(serviceAccountId)}/tokens`, {
       method: 'POST',
       body: JSON.stringify(payload),
     })
@@ -114,7 +125,7 @@ export const apiClient = {
 
   /**
    * Upload a CSV inventory file to replace the entire global metrics target list.
-   * Format: host, port (optional), role (optional), label (optional)
+   * Format: clusterName, host, port (optional, default 9404), role (optional, default BROKER), environment (optional, default NON_PROD)
    */
   uploadMetricsInventory(file: File) {
     const formData = new FormData()
@@ -134,7 +145,7 @@ export const apiClient = {
   },
 
   deleteMetricsTarget(targetId: string) {
-    return request<void>(`/api/platform/metrics/targets/${targetId}`, {
+    return request<void>(`/api/platform/metrics/targets/${encodeURIComponent(targetId)}`, {
       method: 'DELETE',
     })
   },

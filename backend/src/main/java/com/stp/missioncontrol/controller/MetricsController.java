@@ -81,10 +81,12 @@ public class MetricsController {
     private ApiDtos.MetricsTargetResponse toResponse(MetricsTarget target) {
         return new ApiDtos.MetricsTargetResponse(
                 target.getId(),
+                target.getClusterName(),
+                target.getDiscoveredClusterId(),
                 target.getHost(),
                 target.getMetricsPort(),
                 target.getRole(),
-                target.getLabel(),
+                target.getEnvironment(),
                 target.isEnabled(),
                 target.getCreatedAt()
         );

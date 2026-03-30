@@ -1,25 +1,36 @@
-# Prometheus JMX Exporter config for Confluent Platform 7.9
-# Connects to Kafka's remote JMX port and exposes HTTP /metrics on port 4000.
-# See: https://github.com/prometheus/jmx_exporter
-
-hostPort: kafka:9999
+# Prometheus JMX Exporter config — agent mode (runs inside Kafka JVM)
+# Metric names match what LenseIQ MetricsScraperService expects (PascalCase).
+# Mount this as /opt/jmx-exporter/kafka-config.yml inside the container.
 
 lowercaseOutputName: false
 lowercaseOutputLabelNames: false
 
 rules:
-  # ── Broker throughput ────────────────────────────────────────────
+  # ── Cluster ID (key for auto-grouping in LenseIQ) ─────────────────
+  # The ClusterId MBean has a string value attribute containing the UUID.
+  # JMX exporter 1.x exposes string attrs as: metric{attr="full_mbean_value"} 1.0
+  # We let the default export handle this, then parse the clusterId label
+  # in MetricsScraperService.
+  - pattern: 'kafka.server<type=KafkaServer, name=ClusterId><>Value: (.+)'
+    name: kafka_server_KafkaServer_ClusterId
+    value: 1
+    labels:
+      clusterId: "$1"
+    type: UNTYPED
+
+  # ── Broker throughput — all-topics aggregate (OneMinuteRate) ──────
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(MessagesInPerSec|BytesInPerSec|BytesOutPerSec)><>OneMinuteRate'
+    name: kafka_server_BrokerTopicMetrics_$1_OneMinuteRate
+    type: GAUGE
+
+  # Per-topic (kept for completeness; LenseIQ uses the aggregate above)
   - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(MessagesInPerSec|BytesInPerSec|BytesOutPerSec), topic=(.+)><>OneMinuteRate'
     name: kafka_server_BrokerTopicMetrics_$1_OneMinuteRate
     labels:
       topic: "$2"
     type: GAUGE
 
-  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(MessagesInPerSec|BytesInPerSec|BytesOutPerSec)><>OneMinuteRate'
-    name: kafka_server_BrokerTopicMetrics_$1_OneMinuteRate
-    type: GAUGE
-
-  # ── Replica manager ──────────────────────────────────────────────
+  # ── Replica manager ───────────────────────────────────────────────
   - pattern: 'kafka.server<type=ReplicaManager, name=(UnderReplicatedPartitions|LeaderCount|PartitionCount)><>Value'
     name: kafka_server_ReplicaManager_$1
     type: GAUGE
@@ -28,33 +39,22 @@ rules:
     name: kafka_server_ReplicaManager_$1_OneMinuteRate
     type: GAUGE
 
-  # ── Controller ───────────────────────────────────────────────────
+  # ── Controller ────────────────────────────────────────────────────
   - pattern: 'kafka.controller<type=KafkaController, name=(ActiveControllerCount|OfflinePartitionsCount)><>Value'
     name: kafka_controller_KafkaController_$1
     type: GAUGE
 
-  # ── Broker state and cluster ID ──────────────────────────────────
+  # ── Broker state (3=Running) ──────────────────────────────────────
   - pattern: 'kafka.server<type=KafkaServer, name=BrokerState><>Value'
     name: kafka_server_KafkaServer_BrokerState
     type: GAUGE
 
-  - pattern: 'kafka.server<type=KafkaServer, name=ClusterId><>Value\{clusterId="(.+)"\}'
-    name: kafka_server_KafkaServer_ClusterId
-    labels:
-      clusterId: "$1"
-    type: GAUGE
-
-  # Fallback for ClusterId (some exporter versions use this pattern)
-  - pattern: 'kafka.server<type=KafkaServer, name=ClusterId><>Value'
-    name: kafka_server_KafkaServer_ClusterId
-    type: GAUGE
-
-  # ── Request handler pool ─────────────────────────────────────────
+  # ── Request handler idle ratio (0..1) ─────────────────────────────
   - pattern: 'kafka.server<type=KafkaRequestHandlerPool, name=RequestHandlerAvgIdlePercent><>OneMinuteRate'
     name: kafka_server_KafkaRequestHandlerPool_RequestHandlerAvgIdlePercent
     type: GAUGE
 
-  # ── JVM memory ───────────────────────────────────────────────────
+  # ── JVM heap (used by jvm_memory_bytes_used/max{area="heap"}) ────
   - pattern: 'java.lang<type=Memory><HeapMemoryUsage>used'
     name: jvm_memory_bytes_used
     labels:
@@ -66,6 +66,3 @@ rules:
     labels:
       area: heap
     type: GAUGE
-
-  # ── Catch-all (optional — comment out in production for tighter control) ──
-  - pattern: '.*'

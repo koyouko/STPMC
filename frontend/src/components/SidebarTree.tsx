@@ -46,7 +46,7 @@ export function SidebarTree({
           className="sidebar-overview-button"
           onClick={onMetrics}
         >
-          <span>JMX Metrics</span>
+          <span>Inventory</span>
           <small>Broker telemetry</small>
         </button>
       )}
@@ -98,7 +98,7 @@ export function SidebarTree({
 
                       {clusterSelected ? (
                         <div className="tree-components">
-                          {cluster.components.map((component) => (
+                          {cluster.components.filter((c) => c.status !== 'NOT_APPLICABLE').map((component) => (
                             <button
                               key={`${cluster.clusterId}-${component.kind}`}
                               type="button"

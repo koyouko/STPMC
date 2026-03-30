@@ -7,3 +7,4 @@ frontend/node_modules
 frontend/dist
 deploy/mission-control.log
 deploy/mission-control.jar
+config/jmx_prometheus_javaagent-*.jar

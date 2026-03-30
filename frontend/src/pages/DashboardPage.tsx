@@ -104,9 +104,6 @@ export function DashboardPage() {
           </p>
         </div>
         <div className="hero__actions">
-          <button className="primary-button" type="button" onClick={() => void navigate('/clusters/new')}>
-            Onboard cluster
-          </button>
           <button className="secondary-button" type="button" onClick={() => void reloadClusters()}>
             Refresh dashboard
           </button>

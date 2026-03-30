@@ -19,15 +19,17 @@ export function ClusterDetail({ cluster, focusedComponentKind, refreshing, onCle
     )
   }
 
-  const focusedComponent = focusedComponentKind
-    ? cluster.components.find((component) => component.kind === focusedComponentKind) ?? null
+  const rawFocused = focusedComponentKind
+    ? cluster.components.find((c) => c.kind === focusedComponentKind) ?? null
     : null
+  const focusedComponent = rawFocused?.status === 'NOT_APPLICABLE' ? null : rawFocused
+  const applicableComponents = cluster.components.filter((c) => c.status !== 'NOT_APPLICABLE')
   const orderedComponents = focusedComponent
     ? [
         focusedComponent,
-        ...cluster.components.filter((component) => component.kind !== focusedComponent.kind),
+        ...applicableComponents.filter((component) => component.kind !== focusedComponent.kind),
       ]
-    : cluster.components
+    : applicableComponents
 
   return (
     <section className="detail-panel">

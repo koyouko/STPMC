@@ -24,8 +24,17 @@ public class MetricsTarget {
     /** Role label: BROKER, ZOOKEEPER, CONNECT, SCHEMA_REGISTRY, etc. */
     private String role;
 
-    /** Optional human-readable display name */
-    private String label;
+    /** Cluster name from CSV upload for grouping in the inventory view */
+    @Column(name = "cluster_name")
+    private String clusterName;
+
+    /** Environment: PROD or NON_PROD */
+    @Column(length = 10)
+    private String environment;
+
+    /** Cluster ID discovered from JMX scrape — populated after scrapeAll() */
+    @Column(name = "discovered_cluster_id")
+    private String discoveredClusterId;
 
     private boolean enabled;
 
@@ -60,8 +69,14 @@ public class MetricsTarget {
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
 
-    public String getLabel() { return label; }
-    public void setLabel(String label) { this.label = label; }
+    public String getClusterName() { return clusterName; }
+    public void setClusterName(String clusterName) { this.clusterName = clusterName; }
+
+    public String getEnvironment() { return environment; }
+    public void setEnvironment(String environment) { this.environment = environment; }
+
+    public String getDiscoveredClusterId() { return discoveredClusterId; }
+    public void setDiscoveredClusterId(String discoveredClusterId) { this.discoveredClusterId = discoveredClusterId; }
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }

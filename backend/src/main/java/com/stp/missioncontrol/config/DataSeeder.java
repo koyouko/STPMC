@@ -48,9 +48,10 @@ public class DataSeeder {
                     || datasourceUrl.contains("mysql")
                     || datasourceUrl.contains("oracle");
             if (isProductionDb) {
-                log.warn("Production database detected ({}). Demo data seeding skipped. "
-                        + "Set APP_SEED_DEMO_DATA=true explicitly to override.",
-                        datasourceUrl.replaceAll("password=[^&;]*", "password=***"));
+                String dbType = datasourceUrl.contains("postgresql") ? "postgresql"
+                        : datasourceUrl.contains("mysql") ? "mysql" : "oracle";
+                log.warn("Production database detected (type: {}). Demo data seeding skipped. "
+                        + "Set APP_SEED_DEMO_DATA=true explicitly to override.", dbType);
                 return;
             }
 
@@ -82,15 +83,7 @@ public class DataSeeder {
                                                 null
                                         )
                                 )),
-                                List.of(new ApiDtos.ServiceEndpointRequest(
-                                        ComponentKind.SCHEMA_REGISTRY,
-                                        ServiceEndpointProtocol.HTTP,
-                                        properties.defaults().localSchemaRegistryUrl(),
-                                        null,
-                                        null,
-                                        "/subjects",
-                                        "local"
-                                ))
+                                List.of()
                         ),
                         "bootstrap"
                 );

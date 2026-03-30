@@ -95,7 +95,7 @@ function BrokerMetricsCard({ sample }: { sample: BrokerMetricsSample }) {
                 </span>
               )}
             </span>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem', marginTop: '0.1rem' }}>{sample.label}</div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', marginTop: '0.1rem' }}>{sample.discoveredClusterId ?? sample.host}</div>
             <div style={{ color: 'var(--color-muted)', fontSize: '0.75rem' }}>
               {sample.host}:{sample.metricsPort}
             </div>
@@ -296,8 +296,8 @@ export default function MetricsPage() {
     <>
       <header className="hero">
         <div className="hero__content">
-          <span className="eyebrow">Metrics</span>
-          <h1>JMX Metrics</h1>
+          <span className="eyebrow">Inventory</span>
+          <h1>Inventory</h1>
           <p>
             Upload a broker inventory CSV, then click <strong>Scrape Now</strong>. Each broker's
             cluster ID is read automatically from the{' '}
@@ -346,36 +346,57 @@ export default function MetricsPage() {
           </div>
         </div>
 
+        <div style={{ background: 'var(--color-surface, #f8f5f0)', border: '1px solid var(--color-border, #e0dbd4)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: '0.85rem', color: 'var(--color-muted, #78716c)' }}>
+          <strong style={{ color: 'var(--color-text, #1c1917)' }}>CSV format:</strong>{' '}
+          <code>clusterName, host, port, role, environment</code>
+          <br />
+          <span style={{ fontSize: '0.82rem' }}>
+            <code>clusterName</code> and <code>host</code> are required. Port defaults to 9404, role to BROKER, environment to NON_PROD. Lines starting with <code>#</code> are comments.
+          </span>
+          <pre style={{ margin: '8px 0 0', padding: '8px 12px', background: 'var(--color-bg, #faf8f5)', borderRadius: 6, fontSize: '0.8rem', lineHeight: 1.5, overflowX: 'auto' }}>{`# clusterName, host, port, role, environment
+Prod East,broker1.internal,4000,BROKER,PROD
+Prod East,broker2.internal,4000,BROKER,PROD
+Dev Cluster,localhost,4000,BROKER,NON_PROD`}</pre>
+        </div>
+
         {targets.length === 0 ? (
-          <div className="loading-card" style={{ textAlign: 'left' }}>
-            <strong>No targets configured.</strong>
-            <br />
-            Upload a CSV file where each line is: <code>host, port, role, label</code>
-            <br />
-            <span style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>
-              Port defaults to 9404 · role defaults to BROKER · lines starting with # are comments
-            </span>
+          <div className="loading-card" style={{ textAlign: 'center' }}>
+            <strong>No targets configured.</strong> Upload a CSV to get started.
           </div>
         ) : (
           <table className="data-table" style={{ width: '100%' }}>
             <thead>
               <tr>
+                <th>Cluster Name</th>
+                <th>Cluster ID</th>
                 <th>Host</th>
                 <th>Port</th>
                 <th>Role</th>
-                <th>Label</th>
+                <th>Environment</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {targets.map((t) => (
+              {[...targets]
+                .sort((a, b) => (a.clusterName ?? '').localeCompare(b.clusterName ?? ''))
+                .map((t) => (
                 <tr key={t.targetId}>
+                  <td>{t.clusterName ?? <span style={{ color: 'var(--color-muted)', fontStyle: 'italic' }}>—</span>}</td>
+                  <td>
+                    {t.discoveredClusterId
+                      ? <code style={{ fontSize: '0.78rem' }}>{t.discoveredClusterId}</code>
+                      : <span style={{ color: 'var(--color-muted)', fontStyle: 'italic' }}>—</span>}
+                  </td>
                   <td>
                     <code>{t.host}</code>
                   </td>
                   <td>{t.metricsPort}</td>
                   <td>{t.role}</td>
-                  <td>{t.label}</td>
+                  <td>
+                    <span className={`env-badge env-badge--${(t.environment ?? 'non_prod').toLowerCase().replaceAll('_', '-')}`}>
+                      {t.environment === 'PROD' ? 'Production' : 'Non-Prod'}
+                    </span>
+                  </td>
                   <td style={{ textAlign: 'right' }}>
                     <button
                       type="button"

@@ -5,10 +5,10 @@ spring:
     password: ${DB_PASSWORD:}
   h2:
     console:
-      enabled: true
+      enabled: ${H2_CONSOLE_ENABLED:false}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: ${HIBERNATE_DDL_AUTO:validate}
     open-in-view: false
     properties:
       hibernate:
@@ -25,10 +25,11 @@ management:
 
 app:
   security:
-    mode: ${APP_SECURITY_MODE:development}
+    mode: ${APP_SECURITY_MODE:saml}
     allowed-origins:
       - ${APP_ALLOWED_ORIGIN:http://localhost:5173}
       - http://localhost:8080
+    secrets-base-dir: ${APP_SECRETS_BASE_DIR:/etc/secrets}
   health:
     poll-interval-ms: ${APP_HEALTH_POLL_INTERVAL_MS:60000}
     stale-after-ms: ${APP_HEALTH_STALE_AFTER_MS:180000}
@@ -38,7 +39,7 @@ app:
   metrics:
     scrape-timeout-ms: ${APP_METRICS_SCRAPE_TIMEOUT_MS:5000}
   defaults:
-    seed-demo-data: ${APP_SEED_DEMO_DATA:true}
-    seed-local-dev-cluster: ${APP_SEED_LOCAL_DEV_CLUSTER:true}
+    seed-demo-data: ${APP_SEED_DEMO_DATA:false}
+    seed-local-dev-cluster: ${APP_SEED_LOCAL_DEV_CLUSTER:false}
     local-kafka-bootstrap: ${APP_LOCAL_KAFKA_BOOTSTRAP:localhost:9092}
     local-schema-registry-url: ${APP_LOCAL_SCHEMA_REGISTRY_URL:http://localhost:9003}

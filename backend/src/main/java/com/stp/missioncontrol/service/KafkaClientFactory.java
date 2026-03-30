@@ -1,5 +1,6 @@
 package com.stp.missioncontrol.service;
 
+import com.stp.missioncontrol.config.AppProperties;
 import com.stp.missioncontrol.model.Cluster;
 import com.stp.missioncontrol.model.ClusterAuthProfile;
 import com.stp.missioncontrol.model.ClusterListener;
@@ -12,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -25,12 +27,21 @@ import org.springframework.stereotype.Component;
 @Component
 public class KafkaClientFactory {
 
+    private static final Pattern SAFE_JAAS_VALUE = Pattern.compile("^[a-zA-Z0-9_./@:-]+$");
+
     /**
      * Lock protecting the JVM-wide java.security.krb5.conf system property.
      * Multiple clusters may use different Kerberos configs; this ensures
      * the property is set/restored atomically around client creation.
      */
     private static final Object KRB5_LOCK = new Object();
+
+    private final Path secretsBaseDir;
+
+    public KafkaClientFactory(AppProperties properties) {
+        String baseDir = properties.security().secretsBaseDir();
+        this.secretsBaseDir = Path.of(baseDir != null ? baseDir : "/etc/secrets").toAbsolutePath().normalize();
+    }
 
     public ClusterListener resolveListener(Cluster cluster) {
         return cluster.getListeners().stream()
@@ -121,10 +132,17 @@ public class KafkaClientFactory {
             config.put(SaslConfigs.SASL_MECHANISM, "GSSAPI");
             config.put(SaslConfigs.SASL_KERBEROS_SERVICE_NAME,
                     authProfile.getSaslServiceName() == null ? "kafka" : authProfile.getSaslServiceName());
+            String keytab = authProfile.getKeytabPath();
+            String principal = authProfile.getPrincipal();
+            if (keytab != null && !SAFE_JAAS_VALUE.matcher(keytab).matches()) {
+                throw new IllegalArgumentException("Keytab path contains invalid characters (allowed: a-z A-Z 0-9 _ . / @ : -)");
+            }
+            if (principal != null && !SAFE_JAAS_VALUE.matcher(principal).matches()) {
+                throw new IllegalArgumentException("Principal contains invalid characters (allowed: a-z A-Z 0-9 _ . / @ : -)");
+            }
             String jaasConfig = String.format(
                     "com.sun.security.auth.module.Krb5LoginModule required useKeyTab=true storeKey=true keyTab=\"%s\" principal=\"%s\";",
-                    authProfile.getKeytabPath(),
-                    authProfile.getPrincipal()
+                    keytab, principal
             );
             config.put(SaslConfigs.SASL_JAAS_CONFIG, jaasConfig);
         }
@@ -150,8 +168,14 @@ public class KafkaClientFactory {
         if (path == null || path.isBlank()) {
             return Optional.empty();
         }
+        // Prevent path traversal by verifying the resolved path is under the allowed base directory
+        Path resolved = Path.of(path).toAbsolutePath().normalize();
+        if (!resolved.startsWith(secretsBaseDir)) {
+            throw new IllegalArgumentException(
+                    "Secret file path must be under " + secretsBaseDir);
+        }
         try {
-            return Optional.of(Files.readString(Path.of(path)).trim());
+            return Optional.of(Files.readString(resolved).trim());
         } catch (IOException exception) {
             return Optional.empty();
         }

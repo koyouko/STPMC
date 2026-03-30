@@ -12,11 +12,22 @@ fi
 echo "Assembling mission-control.jar from parts..."
 cat mission-control.jar.part.* > mission-control.jar
 
-# Verify
-if file mission-control.jar | grep -q "Java archive"; then
-    echo "[OK] mission-control.jar assembled successfully ($(du -h mission-control.jar | cut -f1))"
-else
+# Verify JAR magic bytes
+if ! file mission-control.jar | grep -q "Java archive"; then
     echo "[ERROR] Assembly failed — not a valid JAR"
     rm -f mission-control.jar
     exit 1
 fi
+
+# Verify checksum if available
+if [ -f mission-control.jar.sha256 ]; then
+    if command -v sha256sum &>/dev/null; then
+        sha256sum -c mission-control.jar.sha256 || { echo "[ERROR] Checksum mismatch"; rm -f mission-control.jar; exit 1; }
+    elif command -v shasum &>/dev/null; then
+        shasum -a 256 -c mission-control.jar.sha256 || { echo "[ERROR] Checksum mismatch"; rm -f mission-control.jar; exit 1; }
+    else
+        echo "[WARN] No sha256sum/shasum available — skipping integrity check"
+    fi
+fi
+
+echo "[OK] mission-control.jar assembled successfully ($(du -h mission-control.jar | cut -f1))"

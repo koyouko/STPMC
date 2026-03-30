@@ -17,6 +17,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -63,15 +64,21 @@ public class SecurityConfig {
     @Bean
     @Order(2)
     SecurityFilterChain appChain(HttpSecurity http) throws Exception {
-        http.csrf(csrf -> csrf.disable())
-                .cors(Customizer.withDefaults())
+        if ("saml".equalsIgnoreCase(properties.security().mode())) {
+            http.csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()));
+        } else {
+            http.csrf(csrf -> csrf.disable());
+        }
+        http.cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/h2-console/**").denyAll()
                         .requestMatchers("/actuator/health", "/error").permitAll()
                         .requestMatchers("/api/platform/self-service/**").hasAnyRole("PLATFORM_ADMIN", "OPERATOR")
                         .requestMatchers(HttpMethod.GET, "/api/platform/**").hasAnyRole("PLATFORM_ADMIN", "OPERATOR", "AUDITOR")
                         .requestMatchers("/api/platform/**").hasAnyRole("PLATFORM_ADMIN", "OPERATOR")
                         .requestMatchers("/api/admin/**").hasRole("PLATFORM_ADMIN")
-                        .anyRequest().permitAll());
+                        .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico").permitAll()
+                        .anyRequest().authenticated());
 
         if ("saml".equalsIgnoreCase(properties.security().mode())) {
             http.saml2Login(Customizer.withDefaults());

@@ -79,11 +79,14 @@ public class GlobalExceptionHandler {
 
     private boolean containsCause(Throwable t, String className) {
         Throwable current = t;
-        while (current != null) {
+        int depth = 0;
+        while (current != null && depth++ < 20) {
             if (current.getClass().getSimpleName().equals(className)) {
                 return true;
             }
-            current = current.getCause();
+            Throwable next = current.getCause();
+            if (next == current) break;
+            current = next;
         }
         return false;
     }

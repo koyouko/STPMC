@@ -256,10 +256,12 @@ public final class ApiDtos {
 
     public record MetricsTargetResponse(
             UUID targetId,
+            String clusterName,
+            String discoveredClusterId,
             String host,
             int metricsPort,
             String role,
-            String label,
+            String environment,
             boolean enabled,
             Instant createdAt
     ) {
@@ -276,7 +278,6 @@ public final class ApiDtos {
             String host,
             int metricsPort,
             String role,
-            String label,
             String discoveredClusterId,
             boolean reachable,
             String errorMessage,

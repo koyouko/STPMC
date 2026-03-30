@@ -70,16 +70,24 @@ public class ClusterService {
     }
 
     public List<Cluster> listClusters() {
-        return clusterRepository.findAll();
+        return clusterRepository.findByActiveTrue();
     }
 
     public boolean hasClusters() {
-        return !clusterRepository.findAll().isEmpty();
+        return clusterRepository.existsByActiveTrue();
     }
 
     public boolean clusterNameExists(String name) {
-        return clusterRepository.findAll().stream()
-                .anyMatch(cluster -> cluster.getName().equalsIgnoreCase(name));
+        return clusterRepository.existsByActiveTrueAndNameIgnoreCase(name);
+    }
+
+    public boolean existsByJmxClusterId(String jmxClusterId) {
+        return clusterRepository.existsByJmxClusterIdAndActiveTrue(jmxClusterId);
+    }
+
+    @Transactional
+    public void saveCluster(Cluster cluster) {
+        clusterRepository.save(cluster);
     }
 
     public Cluster getCluster(UUID clusterId) {

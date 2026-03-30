@@ -3,10 +3,17 @@
   "configurations": [
     {
       "name": "frontend",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" && npm run dev"],
       "port": 5173,
       "cwd": "frontend"
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "/opt/homebrew/bin/mvn",
+      "runtimeArgs": ["spring-boot:run", "-Dspring-boot.run.arguments=--app.security.mode=development --spring.jpa.hibernate.ddl-auto=update --app.defaults.seed-demo-data=true --app.defaults.seed-local-dev-cluster=true --spring.h2.console.enabled=true"],
+      "port": 8080,
+      "cwd": "/Users/rajeev/Documents/Project/LenseIQ/backend"
     }
   ]
 }

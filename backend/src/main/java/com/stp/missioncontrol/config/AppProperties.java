@@ -13,7 +13,8 @@ public record AppProperties(
 
     public record Security(
             String mode,
-            List<String> allowedOrigins
+            List<String> allowedOrigins,
+            String secretsBaseDir
     ) {
     }
 

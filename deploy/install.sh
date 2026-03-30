@@ -25,24 +25,6 @@ if ! command -v git &>/dev/null; then
 fi
 echo -e "  ${GREEN}[OK]${NC} git found"
 
-# Check git-lfs (needed for JAR download)
-if ! git lfs version &>/dev/null 2>&1; then
-  echo "  Git LFS not found. Installing..."
-  if command -v yum &>/dev/null; then
-    sudo yum install -y git-lfs 2>&1 | tail -1
-  elif command -v dnf &>/dev/null; then
-    sudo dnf install -y git-lfs 2>&1 | tail -1
-  elif command -v apt-get &>/dev/null; then
-    sudo apt-get update -qq && sudo apt-get install -y git-lfs 2>&1 | tail -1
-  else
-    echo -e "  ${RED}[ERROR]${NC} Cannot install git-lfs automatically."
-    echo "  Install manually: https://git-lfs.github.com"
-    exit 1
-  fi
-  git lfs install
-fi
-echo -e "  ${GREEN}[OK]${NC} git-lfs found"
-
 # Clone
 if [ -d "$INSTALL_DIR" ]; then
   echo "  Directory $INSTALL_DIR already exists. Updating..."
@@ -54,14 +36,14 @@ else
   cd "$INSTALL_DIR"
 fi
 
-# Verify JAR was pulled via LFS
+# Reassemble JAR from split parts if needed
 if [ ! -f deploy/mission-control.jar ] || [ "$(wc -c < deploy/mission-control.jar)" -lt 1000000 ]; then
-  echo "  Pulling JAR via Git LFS..."
-  git lfs pull
+  echo "  Assembling JAR from split parts..."
+  bash deploy/assemble.sh
 fi
 
 JAR_SIZE=$(du -h deploy/mission-control.jar | cut -f1)
-echo -e "  ${GREEN}[OK]${NC} JAR downloaded ($JAR_SIZE)"
+echo -e "  ${GREEN}[OK]${NC} JAR assembled ($JAR_SIZE)"
 
 # Make scripts executable
 chmod +x deploy/start.sh
