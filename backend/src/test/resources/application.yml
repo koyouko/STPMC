@@ -1,0 +1,45 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  security:
+    mode: development
+    allowed-origins:
+      - http://localhost:5173
+      - http://localhost:8080
+    secrets-base-dir: /tmp/test-secrets
+  health:
+    poll-interval-ms: 600000
+    stale-after-ms: 180000
+    refresh-cooldown-ms: 60000
+    kafka-timeout-ms: 4000
+    probe-timeout-ms: 3000
+  metrics:
+    scrape-timeout-ms: 5000
+  defaults:
+    seed-demo-data: true
+    seed-local-dev-cluster: false
+    local-kafka-bootstrap: localhost:9092
+    local-schema-registry-url: http://localhost:9003
