@@ -179,9 +179,14 @@ case "${1:-start}" in
     echo "  Usage: $0 {start|stop|restart|status}"
     echo ""
     echo "  Environment variables:"
-    echo "    MC_PORT=8080              Server port"
-    echo "    APP_LOCAL_KAFKA_BOOTSTRAP Bootstrap servers"
-    echo "    APP_SEED_DEMO_DATA=true   Seed demo data"
+    echo "    MC_PORT=8080                        Server port"
+    echo "    APP_SECURITY_MODE=saml              Auth mode (saml|development)"
+    echo "    APP_SECRETS_BASE_DIR=/etc/secrets   Base dir for secret files"
+    echo "    APP_ALLOWED_ORIGIN=http://host:port CORS allowed origin"
+    echo "    APP_LOCAL_KAFKA_BOOTSTRAP=host:9092 Bootstrap servers"
+    echo "    APP_SEED_DEMO_DATA=true             Seed demo data"
+    echo "    DB_URL=jdbc:postgresql://...        Database JDBC URL"
+    echo "    DB_USERNAME / DB_PASSWORD            Database credentials"
     exit 1
     ;;
 esac
