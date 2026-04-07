@@ -119,6 +119,12 @@ public class MetricsScraperService {
             String host = (parts.length > 1 && !parts[1].trim().isEmpty())
                     ? parts[1].trim()
                     : null;
+            // Strip URL scheme if present (e.g., "http://hostname" → "hostname")
+            if (host != null) {
+                host = host.replaceFirst("^https?://", "");
+                // Also strip trailing path or port if pasted as full URL
+                host = host.split("[:/]")[0];
+            }
             if (host == null || host.isEmpty()) {
                 log.warn("Line {}: no host specified, skipping", lineNum);
                 continue;
