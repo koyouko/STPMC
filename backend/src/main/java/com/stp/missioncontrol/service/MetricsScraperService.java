@@ -149,12 +149,7 @@ public class MetricsScraperService {
 
             String environment = "NON_PROD";
             if (parts.length > 4 && !parts[4].trim().isEmpty()) {
-                String envStr = parts[4].trim().toUpperCase();
-                if ("PROD".equals(envStr) || "NON_PROD".equals(envStr)) {
-                    environment = envStr;
-                } else {
-                    log.warn("Line {}: invalid environment '{}', using NON_PROD", lineNum, parts[4].trim());
-                }
+                environment = parts[4].trim().toUpperCase();
             }
 
             MetricsTarget target = new MetricsTarget();
@@ -471,7 +466,9 @@ public class MetricsScraperService {
             String clusterName = matchingTarget != null && matchingTarget.getClusterName() != null
                     ? matchingTarget.getClusterName()
                     : "Discovered: " + dc.clusterId();
-            ClusterEnvironment env = matchingTarget != null && "PROD".equals(matchingTarget.getEnvironment())
+            // Map target environment to binary cluster classification:
+            // "PROD" → PROD, everything else (DEV, SIT, UAT, PTE, etc.) → NON_PROD
+            ClusterEnvironment env = matchingTarget != null && "PROD".equalsIgnoreCase(matchingTarget.getEnvironment())
                     ? ClusterEnvironment.PROD
                     : ClusterEnvironment.NON_PROD;
 

@@ -28,8 +28,8 @@ public class MetricsTarget {
     @Column(name = "cluster_name")
     private String clusterName;
 
-    /** Environment: PROD or NON_PROD */
-    @Column(length = 10)
+    /** Environment label from CSV inventory (e.g., DEV, SIT, UAT, PTE, PROD) */
+    @Column(length = 20)
     private String environment;
 
     /** Cluster ID discovered from JMX scrape — populated after scrapeAll() */

@@ -125,7 +125,7 @@ export const apiClient = {
 
   /**
    * Upload a CSV inventory file to replace the entire global metrics target list.
-   * Format: clusterName, host, port (optional, default 9404), role (optional, default BROKER), environment (optional, default NON_PROD)
+   * Format: clusterName, host, port (optional, default 9404), role (optional, default BROKER), environment (optional, e.g. DEV/SIT/UAT/PTE/PROD, default NON_PROD)
    */
   uploadMetricsInventory(file: File) {
     const formData = new FormData()

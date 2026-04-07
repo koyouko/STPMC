@@ -394,7 +394,7 @@ Dev Cluster,localhost,4000,BROKER,NON_PROD`}</pre>
                   <td>{t.role}</td>
                   <td>
                     <span className={`env-badge env-badge--${(t.environment ?? 'non_prod').toLowerCase().replaceAll('_', '-')}`}>
-                      {t.environment === 'PROD' ? 'Production' : 'Non-Prod'}
+                      {t.environment ?? 'Non-Prod'}
                     </span>
                   </td>
                   <td style={{ textAlign: 'right' }}>
