@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "bundled",
+      "runtimeExecutable": "java",
+      "runtimeArgs": ["-jar", "deploy/mission-control.jar", "--app.security.mode=development", "--spring.jpa.hibernate.ddl-auto=update", "--app.defaults.seed-demo-data=true", "--app.defaults.seed-local-dev-cluster=true"],
+      "port": 8080
+    },
+    {
       "name": "frontend",
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": ["-c", "export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" && npm run dev"],
