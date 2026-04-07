@@ -106,7 +106,7 @@ start_server() {
   echo "  Database: $DB_DISPLAY"
   nohup java -jar "$JAR" \
     --server.port="$PORT" \
-    --app.security.allowed-origins=http://localhost:$PORT,http://$(hostname):$PORT \
+    --app.security.allowed-origins=http://localhost:$PORT,http://$(hostname):$PORT,http://$(hostname -f 2>/dev/null || hostname):$PORT${APP_ALLOWED_ORIGIN:+,$APP_ALLOWED_ORIGIN} \
     $PROFILE_ARG \
     > "$LOG_FILE" 2>&1 &
 
