@@ -258,14 +258,14 @@ public class MetricsScraperService {
         if (!isAllowedHost(target.getHost())) {
             return errorSample(target, 0, "Host resolves to a restricted address");
         }
-        String url = "http://" + target.getHost() + ":" + target.getMetricsPort() + "/metrics";
+        String baseUrl = "http://" + target.getHost() + ":" + target.getMetricsPort();
         Instant start = Instant.now();
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                    .GET()
-                    .timeout(Duration.ofMillis(SCRAPE_TIMEOUT_MS))
-                    .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            // Try root path first (JMX exporter Java agent default), fall back to /metrics
+            HttpResponse<String> response = scrapeUrl(baseUrl + "/");
+            if (response.statusCode() == 404) {
+                response = scrapeUrl(baseUrl + "/metrics");
+            }
             long latencyMs = Duration.between(start, Instant.now()).toMillis();
 
             if (response.statusCode() >= 400) {
@@ -281,6 +281,14 @@ public class MetricsScraperService {
             log.debug("Scrape failed for {}:{} — {}", target.getHost(), target.getMetricsPort(), msg);
             return errorSample(target, latencyMs, msg);
         }
+    }
+
+    private HttpResponse<String> scrapeUrl(String url) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                .GET()
+                .timeout(Duration.ofMillis(SCRAPE_TIMEOUT_MS))
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
     // ── Prometheus text format parser ─────────────────────────────────
