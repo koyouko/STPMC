@@ -68,17 +68,30 @@ Default backend behavior:
 - Uses development auth for platform/admin APIs via request headers or the built-in local admin fallback
 - If Kafka is available on `localhost:9092` and Schema Registry is available on `http://localhost:8081`, the app auto-seeds a `Local Kafka Dev` cluster and checks real health instead of demo-only placeholder health
 
-Optional Postgres:
+### PostgreSQL (persistent data)
+
+Activate the `postgres` Spring profile to switch from H2 to PostgreSQL:
 
 ```bash
-cd /Users/rajeev/Documents/Project/LenseIQ
-docker compose up -d
-cd /Users/rajeev/Documents/Project/LenseIQ/backend
-DB_URL=jdbc:postgresql://localhost:5432/mission_control \
-DB_USERNAME=mission_control \
-DB_PASSWORD=mission_control \
-./mvnw spring-boot:run
+# Start PostgreSQL via docker-compose
+docker compose up -d postgres
+
+# Run backend with postgres profile (tables auto-created on first run)
+cd backend
+./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
 ```
+
+Or with an external PostgreSQL (e.g., RHEL 8 production):
+
+```bash
+DB_URL=jdbc:postgresql://your-host:5432/mission_control \
+DB_USERNAME=your_user \
+DB_PASSWORD=your_password \
+HIBERNATE_DDL_AUTO=validate \
+./deploy/start.sh start
+```
+
+The `postgres` profile auto-activates when `DB_URL` contains "postgresql". See `application-postgres.yml` for all configurable settings.
 
 ### Windows backend commands
 

@@ -84,11 +84,30 @@ start_server() {
     exit 0
   fi
 
+  # Auto-detect PostgreSQL profile from DB_URL
+  PROFILES="${SPRING_PROFILES_ACTIVE:-}"
+  if [ -n "${DB_URL:-}" ] && echo "$DB_URL" | grep -qi "postgresql" && ! echo "$PROFILES" | grep -q "postgres"; then
+    PROFILES="${PROFILES:+$PROFILES,}postgres"
+  fi
+  PROFILE_ARG=""
+  if [ -n "$PROFILES" ]; then
+    PROFILE_ARG="--spring.profiles.active=$PROFILES"
+  fi
+
+  # Display database type
+  if echo "${PROFILES:-}" | grep -q "postgres"; then
+    DB_DISPLAY="PostgreSQL (${DB_URL:-docker-compose defaults})"
+  else
+    DB_DISPLAY="H2 (in-memory)"
+  fi
+
   echo ""
   echo "  Starting on port $PORT..."
+  echo "  Database: $DB_DISPLAY"
   nohup java -jar "$JAR" \
     --server.port="$PORT" \
     --app.security.allowed-origins=http://localhost:$PORT,http://$(hostname):$PORT \
+    $PROFILE_ARG \
     > "$LOG_FILE" 2>&1 &
 
   echo $! > "$PID_FILE"
@@ -104,7 +123,7 @@ start_server() {
       echo "   URL:      http://$(hostname):$PORT"
       echo "   Log:      $LOG_FILE"
       echo "   PID:      $(cat "$PID_FILE")"
-      echo "   Database: H2 (in-memory)"
+      echo "   Database: $DB_DISPLAY"
       echo ""
       echo "   Stop:     $0 stop"
       echo "   Status:   $0 status"
@@ -180,6 +199,7 @@ case "${1:-start}" in
     echo ""
     echo "  Environment variables:"
     echo "    MC_PORT=8080                        Server port"
+    echo "    SPRING_PROFILES_ACTIVE=postgres     Use PostgreSQL instead of H2"
     echo "    APP_SECURITY_MODE=saml              Auth mode (saml|development)"
     echo "    APP_SECRETS_BASE_DIR=/etc/secrets   Base dir for secret files"
     echo "    APP_ALLOWED_ORIGIN=http://host:port CORS allowed origin"

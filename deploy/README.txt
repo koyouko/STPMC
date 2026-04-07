@@ -34,9 +34,25 @@ CONNECTING TO KAFKA CLUSTERS
 4. Select auth type (Plaintext / mTLS / Kerberos)
 5. Click "Test Connection" then "Save"
 
-Database: H2 in-memory (resets on restart)
-To persist data, set environment variables for PostgreSQL:
-  set SPRING_DATASOURCE_URL=jdbc:postgresql://host:5432/missioncontrol
-  set SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
-  set SPRING_DATASOURCE_USERNAME=postgres
-  set SPRING_DATASOURCE_PASSWORD=yourpassword
+DATABASE
+---------
+Default: H2 in-memory (resets on restart).
+To persist data, switch to PostgreSQL:
+
+Option 1: Docker Compose (local dev)
+  docker compose up -d postgres
+  SPRING_PROFILES_ACTIVE=postgres ./start.sh start
+
+Option 2: External PostgreSQL (production / RHEL 8)
+  DB_URL=jdbc:postgresql://your-host:5432/mission_control \
+  DB_USERNAME=your_user \
+  DB_PASSWORD=your_password \
+  ./start.sh start
+  (postgres profile is auto-activated when DB_URL contains "postgresql")
+
+First run: Tables are created automatically (ddl-auto=update).
+Production: After initial setup, set HIBERNATE_DDL_AUTO=validate
+            to prevent schema changes on startup.
+
+Migration note: If upgrading from a previous version, run:
+  ALTER TABLE clusters ADD COLUMN jmx_cluster_id VARCHAR(255);
