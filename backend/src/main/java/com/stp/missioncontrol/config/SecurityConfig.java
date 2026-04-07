@@ -78,6 +78,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/platform/**").hasAnyRole("PLATFORM_ADMIN", "OPERATOR")
                         .requestMatchers("/api/admin/**").hasRole("PLATFORM_ADMIN")
                         .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico", "/favicon.svg", "/icons.svg").permitAll()
+                        .requestMatchers("/clusters/**", "/metrics/**", "/audit/**").permitAll()
                         .anyRequest().authenticated());
 
         if ("saml".equalsIgnoreCase(properties.security().mode())) {
