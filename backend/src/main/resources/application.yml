@@ -8,7 +8,7 @@ spring:
       enabled: ${H2_CONSOLE_ENABLED:false}
   jpa:
     hibernate:
-      ddl-auto: ${HIBERNATE_DDL_AUTO:validate}
+      ddl-auto: ${HIBERNATE_DDL_AUTO:update}
     open-in-view: false
     properties:
       hibernate:
