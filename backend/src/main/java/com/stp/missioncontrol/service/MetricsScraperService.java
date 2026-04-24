@@ -324,6 +324,35 @@ public class MetricsScraperService {
         return scrapeTimeoutMs;
     }
 
+    /**
+     * Diagnostic: fetch the raw Prometheus text from a single target's JMX
+     * exporter. Used by the {@code GET /targets/{targetId}/raw} endpoint so
+     * operators can inspect exactly what the exporter is emitting (useful
+     * when some metrics aren't populating — confirms whether the metric
+     * name / label shape matches what the scraper expects).
+     */
+    public Optional<String> scrapeRawBody(UUID targetId) {
+        MetricsTarget target = metricsTargetRepository.findById(targetId).orElse(null);
+        if (target == null) return Optional.empty();
+        if (!isAllowedHost(target.getHost())) {
+            return Optional.of("ERROR: host resolves to a restricted address\n");
+        }
+        String baseUrl = "http://" + target.getHost() + ":" + target.getMetricsPort();
+        try {
+            HttpResponse<String> response = scrapeUrl(baseUrl + "/");
+            if (response.statusCode() == 404) {
+                response = scrapeUrl(baseUrl + "/metrics");
+            }
+            return Optional.of(
+                    "# HTTP " + response.statusCode() + " from " + baseUrl + "\n"
+                            + "# " + response.body().length() + " bytes\n"
+                            + response.body());
+        } catch (Exception e) {
+            return Optional.of("ERROR scraping " + baseUrl + ": "
+                    + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()) + "\n");
+        }
+    }
+
     private void writeBackDiscoveredClusterIds(List<MetricsTarget> targets,
                                                 List<ApiDtos.BrokerMetricsSample> samples) {
         Map<UUID, String> targetToClusterId = new LinkedHashMap<>();
@@ -463,18 +492,34 @@ public class MetricsScraperService {
 
     /**
      * Returns the value for a metric without a topic label (all-topics aggregate).
-     * Accepts a list of candidate names (e.g. with and without a {@code _total} suffix,
-     * which some JMX exporter rule sets append). Returns the first match.
+     * Accepts a list of candidate names (e.g. with and without a {@code _total}
+     * suffix, which some JMX exporter rule sets append).
+     *
+     * <p>Resolution order per candidate:
+     * <ol>
+     *   <li>Single sample without a {@code topic} label → use it.</li>
+     *   <li>Multiple per-topic samples → <b>sum across topics</b>. This covers
+     *       production yml configs that only expose per-topic OneMinuteRate
+     *       rules and omit the all-topics aggregate rule.</li>
+     * </ol>
+     * Returns -1 if no candidate matches any sample.
      */
     private double getAggregateMetric(List<MetricSample> samples, String... candidateNames) {
         for (String name : candidateNames) {
-            var match = samples.stream()
+            var unlabeled = samples.stream()
                     .filter(s -> s.name().equals(name) && !s.labels().containsKey("topic"))
-                    .findFirst()
-                    .or(() -> samples.stream()
-                            .filter(s -> s.name().equals(name))
-                            .findFirst());
-            if (match.isPresent()) return match.get().value();
+                    .findFirst();
+            if (unlabeled.isPresent()) return unlabeled.get().value();
+
+            List<MetricSample> perTopic = samples.stream()
+                    .filter(s -> s.name().equals(name))
+                    .toList();
+            if (!perTopic.isEmpty()) {
+                return perTopic.stream()
+                        .mapToDouble(MetricSample::value)
+                        .filter(v -> !Double.isNaN(v) && !Double.isInfinite(v))
+                        .sum();
+            }
         }
         return -1.0;
     }

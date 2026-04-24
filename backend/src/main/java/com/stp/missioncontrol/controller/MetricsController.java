@@ -100,6 +100,21 @@ public class MetricsController {
         );
     }
 
+    /**
+     * Diagnostic: return the raw Prometheus text from a single target's JMX
+     * exporter. Useful when some metrics aren't populating on the UI - the
+     * operator can see exactly what the exporter emits and confirm whether
+     * the metric names / label shape match what the scraper looks up.
+     *
+     * <pre>curl http://$host:8080/api/platform/metrics/targets/$TARGET_ID/raw | grep -i messagesin</pre>
+     */
+    @GetMapping(value = "/targets/{targetId}/raw", produces = "text/plain")
+    public ResponseEntity<String> rawScrape(@PathVariable UUID targetId) {
+        return metricsScraperService.scrapeRawBody(targetId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     private ApiDtos.MetricsTargetResponse toResponse(MetricsTarget target) {
         return new ApiDtos.MetricsTargetResponse(
                 target.getId(),
