@@ -41,13 +41,13 @@ To persist data, switch to PostgreSQL:
 
 Option 1: Docker Compose (local dev)
   docker compose up -d postgres
-  SPRING_PROFILES_ACTIVE=postgres ./start.sh start
+  SPRING_PROFILES_ACTIVE=postgres ./stpmc-ctrl.sh start
 
 Option 2: External PostgreSQL (production / RHEL 8)
   DB_URL=jdbc:postgresql://your-host:5432/mission_control \
   DB_USERNAME=your_user \
   DB_PASSWORD=your_password \
-  ./start.sh start
+  ./stpmc-ctrl.sh start
   (postgres profile is auto-activated when DB_URL contains "postgresql")
 
 First run: Tables are created automatically (ddl-auto=update).

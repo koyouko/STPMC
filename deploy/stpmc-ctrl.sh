@@ -1,5 +1,9 @@
 #!/bin/bash
-# STP Kafka Mission Control - RHEL 8 / Linux Launcher
+# STP Kafka Mission Control - control script (start/stop/restart/status/logs)
+#
+# Supports log-level selection via --debug, --trace, --info, --warn (or
+# LOG_LEVEL env var). All app.* env vars that the JAR honors are documented
+# at the bottom under `usage`.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -27,9 +31,27 @@ print_banner() {
   echo ""
 }
 
+# ── Log-level parsing ────────────────────────────────────
+# Defaults: root=INFO, app=INFO. Env LOG_LEVEL bumps app. CLI flag overrides
+# env. --debug keeps framework at INFO and raises only app code to DEBUG
+# (the usual troubleshooting setting). --all-debug raises everything.
+APP_LOG_LEVEL="${LOG_LEVEL:-INFO}"
+ROOT_LOG_LEVEL="INFO"
+
+parse_log_flag() {
+  case "$1" in
+    --debug)     APP_LOG_LEVEL=DEBUG ;;
+    --trace)     APP_LOG_LEVEL=TRACE ;;
+    --info)      APP_LOG_LEVEL=INFO ;;
+    --warn)      APP_LOG_LEVEL=WARN ;;
+    --all-debug) APP_LOG_LEVEL=DEBUG; ROOT_LOG_LEVEL=DEBUG ;;
+    "" ) ;;
+    *) echo -e "  ${YELLOW}[WARN]${NC} Unknown flag '$1' ignored" ;;
+  esac
+}
+
 check_java() {
   if command -v java &>/dev/null; then
-    # Java found — check version is 17+
     JAVA_VER_NUM=$(java -version 2>&1 | head -1 | sed -E 's/.*"([0-9]+).*/\1/')
     JAVA_VER=$(java -version 2>&1 | head -1)
     if [ "$JAVA_VER_NUM" -ge 17 ] 2>/dev/null; then
@@ -42,7 +64,6 @@ check_java() {
     echo -e "  ${YELLOW}[WARN]${NC} Java not found"
   fi
 
-  # Attempt auto-install
   echo "  Attempting to install Java 17..."
   if command -v yum &>/dev/null; then
     sudo yum install -y java-17-openjdk 2>&1 | tail -3
@@ -57,7 +78,6 @@ check_java() {
     exit 1
   fi
 
-  # Verify after install
   if ! command -v java &>/dev/null; then
     echo -e "  ${RED}[ERROR]${NC} Java installation failed"
     exit 1
@@ -76,7 +96,6 @@ check_jar() {
 }
 
 start_server() {
-  # Check if already running
   if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
     echo -e "  ${YELLOW}[WARN]${NC} Server already running (PID $(cat "$PID_FILE"))"
     echo "  URL: http://$(hostname):$PORT"
@@ -94,7 +113,6 @@ start_server() {
     PROFILE_ARG="--spring.profiles.active=$PROFILES"
   fi
 
-  # Display database type
   if echo "${PROFILES:-}" | grep -q "postgres"; then
     DB_DISPLAY="PostgreSQL (${DB_URL:-docker-compose defaults})"
   else
@@ -103,31 +121,35 @@ start_server() {
 
   echo ""
   echo "  Starting on port $PORT..."
-  echo "  Database: $DB_DISPLAY"
+  echo "  Database:  $DB_DISPLAY"
+  echo "  Log level: root=$ROOT_LOG_LEVEL  app=$APP_LOG_LEVEL"
+
   nohup java -jar "$JAR" \
     --server.port="$PORT" \
     --app.security.allowed-origins=http://localhost:$PORT,http://$(hostname):$PORT,http://$(hostname -f 2>/dev/null || hostname):$PORT${APP_ALLOWED_ORIGIN:+,$APP_ALLOWED_ORIGIN} \
+    --logging.level.root="$ROOT_LOG_LEVEL" \
+    --logging.level.com.stp.missioncontrol="$APP_LOG_LEVEL" \
     $PROFILE_ARG \
     > "$LOG_FILE" 2>&1 &
 
   echo $! > "$PID_FILE"
   echo "  PID: $(cat "$PID_FILE")"
 
-  # Wait for startup
   echo "  Waiting for server to be ready..."
   for i in $(seq 1 30); do
     if curl -sf "http://localhost:$PORT/actuator/health" &>/dev/null; then
       echo -e "  ${GREEN}[OK]${NC} Server is ready"
       echo ""
       echo "  ============================================="
-      echo "   URL:      http://$(hostname):$PORT"
-      echo "   Log:      $LOG_FILE"
-      echo "   PID:      $(cat "$PID_FILE")"
-      echo "   Database: $DB_DISPLAY"
+      echo "   URL:       http://$(hostname):$PORT"
+      echo "   Log:       $LOG_FILE  (level $APP_LOG_LEVEL)"
+      echo "   PID:       $(cat "$PID_FILE")"
+      echo "   Database:  $DB_DISPLAY"
       echo ""
-      echo "   Stop:     $0 stop"
-      echo "   Status:   $0 status"
-      echo "   Logs:     tail -f $LOG_FILE"
+      echo "   Stop:      $0 stop"
+      echo "   Status:    $0 status"
+      echo "   Logs:      $0 logs      (tail -f)"
+      echo "   Restart:   $0 restart [--debug|--info]"
       echo "  ============================================="
       echo ""
       return 0
@@ -165,17 +187,78 @@ show_status() {
   if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
     PID=$(cat "$PID_FILE")
     echo -e "  ${GREEN}[RUNNING]${NC} PID $PID"
-    echo "  URL: http://$(hostname):$PORT"
+    echo "  URL:     http://$(hostname):$PORT"
     HEALTH=$(curl -sf "http://localhost:$PORT/actuator/health" 2>/dev/null || echo "unreachable")
-    echo "  Health: $HEALTH"
+    echo "  Health:  $HEALTH"
+    CONFIG=$(curl -sf "http://localhost:$PORT/api/platform/metrics/config" 2>/dev/null || echo "{}")
+    echo "  Metrics: $CONFIG"
   else
     echo -e "  ${RED}[STOPPED]${NC} Server is not running"
   fi
 }
 
+tail_logs() {
+  if [ ! -f "$LOG_FILE" ]; then
+    echo -e "  ${RED}[ERROR]${NC} Log file not found: $LOG_FILE"
+    exit 1
+  fi
+  exec tail -f "$LOG_FILE"
+}
+
+usage() {
+  cat <<USAGE
+  Usage: $0 {start|stop|restart|status|logs} [--debug|--trace|--info|--warn|--all-debug]
+
+  Log-level flags (apply to 'start' and 'restart'):
+    --debug        com.stp.missioncontrol=DEBUG (framework stays INFO)
+    --trace        com.stp.missioncontrol=TRACE
+    --info         com.stp.missioncontrol=INFO (default)
+    --warn         com.stp.missioncontrol=WARN
+    --all-debug    Everything at DEBUG (noisy - Spring, Hibernate, etc.)
+    LOG_LEVEL=...  Env override for the app logger (CLI flag wins if both set)
+
+  Common environment variables:
+    MC_PORT=8080                           HTTP port (default 8080)
+    SPRING_PROFILES_ACTIVE=postgres        Use PostgreSQL instead of H2
+    APP_SECURITY_MODE=saml                 Auth mode (saml|development)
+    APP_SECRETS_BASE_DIR=/etc/secrets      Base dir for secret files
+    APP_ALLOWED_ORIGIN=http://host:port    Extra CORS allowed origin
+    APP_LOCAL_KAFKA_BOOTSTRAP=host:9092    Bootstrap servers (dev seed)
+    APP_SEED_DEMO_DATA=true                Seed demo data on empty DB
+    APP_SEED_LOCAL_DEV_CLUSTER=true        Seed the 'Local Kafka Dev' cluster
+    DB_URL=jdbc:postgresql://...           Database JDBC URL
+    DB_USERNAME / DB_PASSWORD              Database credentials
+
+  Scraper tuning (see /api/platform/metrics/config for live values):
+    APP_METRICS_SCRAPE_TIMEOUT_MS=150000   Per-request HTTP timeout (ms)
+    APP_METRICS_SCRAPE_INTERVAL_MS=60000   Auto-scrape interval (0 disables)
+    APP_METRICS_SCRAPE_INITIAL_DELAY_MS=30000
+                                           Delay before first auto-scrape
+
+  Cluster health poll:
+    APP_HEALTH_POLL_INTERVAL_MS=60000      Kafka AdminClient probe interval
+    APP_HEALTH_STALE_AFTER_MS=180000       Snapshot staleness window
+    APP_HEALTH_REFRESH_COOLDOWN_MS=60000   Min time between manual refreshes
+    APP_KAFKA_TIMEOUT_MS=4000              Kafka client timeout
+    APP_PROBE_TIMEOUT_MS=3000              HTTP probe timeout (SR, C3, etc.)
+
+  Examples:
+    $0 start                               Start with defaults (INFO)
+    $0 start --debug                       Start with DEBUG for our code
+    LOG_LEVEL=DEBUG $0 start               Same effect via env var
+    APP_METRICS_SCRAPE_TIMEOUT_MS=180000 $0 restart --debug
+    $0 logs                                tail -f the server log
+    $0 status                              PID + /actuator/health + /config
+USAGE
+}
+
 # ── Main ─────────────────────────────────────────────────
 print_banner
-case "${1:-start}" in
+COMMAND="${1:-start}"
+FLAG="${2:-}"
+parse_log_flag "$FLAG"
+
+case "$COMMAND" in
   start)
     check_java
     check_jar
@@ -194,19 +277,14 @@ case "${1:-start}" in
   status)
     show_status
     ;;
+  logs)
+    tail_logs
+    ;;
+  -h|--help|help)
+    usage
+    ;;
   *)
-    echo "  Usage: $0 {start|stop|restart|status}"
-    echo ""
-    echo "  Environment variables:"
-    echo "    MC_PORT=8080                        Server port"
-    echo "    SPRING_PROFILES_ACTIVE=postgres     Use PostgreSQL instead of H2"
-    echo "    APP_SECURITY_MODE=saml              Auth mode (saml|development)"
-    echo "    APP_SECRETS_BASE_DIR=/etc/secrets   Base dir for secret files"
-    echo "    APP_ALLOWED_ORIGIN=http://host:port CORS allowed origin"
-    echo "    APP_LOCAL_KAFKA_BOOTSTRAP=host:9092 Bootstrap servers"
-    echo "    APP_SEED_DEMO_DATA=true             Seed demo data"
-    echo "    DB_URL=jdbc:postgresql://...        Database JDBC URL"
-    echo "    DB_USERNAME / DB_PASSWORD            Database credentials"
+    usage
     exit 1
     ;;
 esac
