@@ -91,11 +91,12 @@ public class MetricsController {
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
-    /** Client-facing scraper configuration (e.g. auto-scrape interval). */
+    /** Client-facing scraper configuration (auto-scrape interval + per-request timeout). */
     @GetMapping("/config")
     public java.util.Map<String, Object> config() {
         return java.util.Map.of(
-                "scrapeIntervalMs", metricsScraperService.getScrapeIntervalMs()
+                "scrapeIntervalMs", metricsScraperService.getScrapeIntervalMs(),
+                "scrapeTimeoutMs", metricsScraperService.getScrapeTimeoutMs()
         );
     }
 

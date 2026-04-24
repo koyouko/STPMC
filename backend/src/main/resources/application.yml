@@ -37,7 +37,12 @@ app:
     kafka-timeout-ms: ${APP_KAFKA_TIMEOUT_MS:4000}
     probe-timeout-ms: ${APP_PROBE_TIMEOUT_MS:3000}
   metrics:
-    scrape-timeout-ms: ${APP_METRICS_SCRAPE_TIMEOUT_MS:5000}
+    # Per-request HTTP timeout (ms) for scraping a single JMX /metrics
+    # endpoint. Default is generous (150s) because some production
+    # JMX exporters can take 1-2 min to return on heavily loaded brokers
+    # with thousands of MBeans. Tune down (e.g. 10000) in fast networks
+    # where you want failure detection within seconds.
+    scrape-timeout-ms: ${APP_METRICS_SCRAPE_TIMEOUT_MS:150000}
     # Background auto-scrape interval in ms. Set to 0 to disable auto-scraping.
     scrape-interval-ms: ${APP_METRICS_SCRAPE_INTERVAL_MS:60000}
     # Delay before the first auto-scrape after app startup, in ms.

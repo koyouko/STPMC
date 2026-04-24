@@ -42,11 +42,9 @@ import org.springframework.web.multipart.MultipartFile;
 public class MetricsScraperService {
 
     private static final Logger log = LoggerFactory.getLogger(MetricsScraperService.class);
-    private static final int SCRAPE_TIMEOUT_MS = 5000;
     private static final int MAX_CSV_SIZE_BYTES = 1_048_576; // 1 MB
     private static final int MAX_TARGETS = 500;
     private static final int SCRAPE_PARALLELISM = 10;
-    private static final int SCRAPE_OVERALL_TIMEOUT_SECONDS = 120;
     private static final Pattern LABEL_PATTERN = Pattern.compile("(\\w+)=\"([^\"]*)\"");
 
     // JMX metric that carries the Kafka cluster UUID as a label value.
@@ -62,6 +60,10 @@ public class MetricsScraperService {
     private final boolean allowLoopback;
     private final ExecutorService metricsScraperExecutor;
     private final long scrapeIntervalMs;
+    /** Per-request HTTP timeout (connect + full response). Configurable via
+     *  app.metrics.scrape-timeout-ms — environments whose JMX exporters take
+     *  minutes to produce a response should set this high (e.g. 150000). */
+    private final int scrapeTimeoutMs;
     /** In-memory cache of the most recent {@link #scrapeAll()} result.
      *  Read path ({@code GET /last-scrape}) lets the UI render sidebar
      *  broker lists and the cluster-page inventory panel without triggering
@@ -75,8 +77,9 @@ public class MetricsScraperService {
         this.metricsTargetRepository = metricsTargetRepository;
         this.clusterService = clusterService;
         this.allowLoopback = !"saml".equalsIgnoreCase(properties.security().mode());
+        this.scrapeTimeoutMs = properties.metrics().scrapeTimeoutMs();
         this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(SCRAPE_TIMEOUT_MS))
+                .connectTimeout(Duration.ofMillis(Math.min(scrapeTimeoutMs, 30_000)))
                 .build();
         this.metricsScraperExecutor = metricsScraperExecutor;
         this.scrapeIntervalMs = properties.metrics().scrapeIntervalMs();
@@ -230,13 +233,20 @@ public class MetricsScraperService {
         List<CompletableFuture<ApiDtos.BrokerMetricsSample>> futures = targets.stream()
                 .map(target -> CompletableFuture.supplyAsync(() -> scrapeTarget(target), metricsScraperExecutor))
                 .toList();
+        // Overall timeout = enough time for every target to fail its own per-request
+        // timeout in a worst-case serialized-within-parallelism run, plus headroom.
+        //   batches = ceil(N / parallelism), each batch can take up to scrapeTimeoutMs
+        long batches = Math.max(1L, (long) Math.ceil((double) targets.size() / SCRAPE_PARALLELISM));
+        long overallTimeoutSec = Math.max(60L, (batches * scrapeTimeoutMs) / 1000L + 30L);
+
         List<ApiDtos.BrokerMetricsSample> samples;
         try {
             CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
-                    .get(SCRAPE_OVERALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    .get(overallTimeoutSec, TimeUnit.SECONDS);
             samples = futures.stream().map(CompletableFuture::join).toList();
         } catch (Exception e) {
-            log.warn("Scrape timed out or was interrupted, collecting partial results: {}", e.getMessage());
+            log.warn("Scrape timed out (>{}s) or was interrupted, collecting partial results: {}",
+                    overallTimeoutSec, e.getMessage());
             samples = futures.stream()
                     .filter(f -> f.isDone() && !f.isCompletedExceptionally())
                     .map(f -> f.getNow(null))
@@ -309,6 +319,11 @@ public class MetricsScraperService {
         return scrapeIntervalMs;
     }
 
+    /** Configured per-request HTTP timeout in ms for a single JMX /metrics scrape. */
+    public int getScrapeTimeoutMs() {
+        return scrapeTimeoutMs;
+    }
+
     private void writeBackDiscoveredClusterIds(List<MetricsTarget> targets,
                                                 List<ApiDtos.BrokerMetricsSample> samples) {
         Map<UUID, String> targetToClusterId = new LinkedHashMap<>();
@@ -367,7 +382,7 @@ public class MetricsScraperService {
     private HttpResponse<String> scrapeUrl(String url) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
                 .GET()
-                .timeout(Duration.ofMillis(SCRAPE_TIMEOUT_MS))
+                .timeout(Duration.ofMillis(scrapeTimeoutMs))
                 .build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
