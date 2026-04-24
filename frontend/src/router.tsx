@@ -5,6 +5,7 @@ import { ClusterDetailPage } from './pages/ClusterDetailPage'
 import { ClusterOnboardingPage } from './pages/ClusterOnboardingPage'
 import { ClusterEditPage } from './pages/ClusterEditPage'
 import ClusterMetricsPage from './pages/ClusterMetricsPage'
+import BrokerDetailPage from './pages/BrokerDetailPage'
 import AuditLogPage from './pages/AuditLogPage'
 
 function ErrorBoundary() {
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
       { path: '/clusters/new', element: <ClusterOnboardingPage /> },
       { path: '/clusters/:clusterId', element: <ClusterDetailPage /> },
       { path: '/clusters/:clusterId/edit', element: <ClusterEditPage /> },
+      { path: '/clusters/:clusterId/brokers/:targetId', element: <BrokerDetailPage /> },
       { path: '/metrics', element: <ClusterMetricsPage /> },
       { path: '/audit', element: <AuditLogPage /> },
       { path: '*', element: <NotFound /> },

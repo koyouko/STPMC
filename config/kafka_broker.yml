@@ -1,0 +1,83 @@
+# Prometheus JMX Exporter config — agent mode (inside Kafka JVM).
+#
+# Mirrors the Confluent-style kafka_broker.yml used in the user's production
+# environment. Two flags are the whole point of this test fixture:
+#
+#   lowercaseOutputName:       true
+#   lowercaseOutputLabelNames: true
+#
+# Production also sets startDelaySeconds: 120 (exporter returns empty body for
+# 2 min after JVM start). Set to 0 here for faster local testing.
+#
+# Mounted at /opt/jmx-exporter/kafka-config.yml inside the container.
+
+startDelaySeconds: 0
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+blacklistObjectNames:
+  - "kafka.consumer:type=*,id=*"
+  - "kafka.consumer:type=*,client-id=*"
+  - "kafka.consumer:type=*,client-id=*,node-id=*"
+  - "kafka.producer:type=*,id=*"
+  - "kafka.producer:type=*,client-id=*"
+  - "kafka.producer:type=*,client-id=*,node-id=*"
+  - "kafka.*:type=kafka-metrics-count,*"
+
+rules:
+  # NOTE: The ClusterId rule is intentionally commented out below to simulate
+  # the user's production yml (which lacks it). This exercises the
+  # clusterName-fallback path in autoOnboardDiscoveredClusters.
+  # - pattern: 'kafka.server<type=KafkaServer, name=ClusterId><>Value: (.+)'
+  #   name: kafka_server_KafkaServer_ClusterId
+  #   value: 1
+  #   labels:
+  #     clusterId: "$1"
+  #   type: UNTYPED
+
+  # ── Per-topic/partition metrics (Value attribute) ────────────────────────────
+  - pattern: kafka.(\w+)<type=(.+), name=(.+), topic=(.+), partition=(.+)><>Value
+    name: kafka_$1_$2_$3
+    type: GAUGE
+    labels:
+      topic: "$4"
+      partition: "$5"
+
+  # ── Broker throughput — all-topics aggregate (OneMinuteRate) ─────────────────
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(MessagesInPerSec|BytesInPerSec|BytesOutPerSec)><>OneMinuteRate'
+    name: kafka_server_BrokerTopicMetrics_$1_OneMinuteRate
+    type: GAUGE
+
+  # Per-topic rate (kept for completeness; scraper uses the aggregate above)
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(MessagesInPerSec|BytesInPerSec|BytesOutPerSec), topic=(.+)><>OneMinuteRate'
+    name: kafka_server_BrokerTopicMetrics_$1_OneMinuteRate
+    type: GAUGE
+    labels:
+      topic: "$2"
+
+  # ── ReplicaManager + Controller gauges ──────────────────────────────────────
+  - pattern: 'kafka.server<type=ReplicaManager, name=(UnderReplicatedPartitions|LeaderCount|PartitionCount)><>Value'
+    name: kafka_server_ReplicaManager_$1
+    type: GAUGE
+
+  - pattern: 'kafka.server<type=ReplicaManager, name=(IsrShrinksPerSec|IsrExpandsPerSec)><>OneMinuteRate'
+    name: kafka_server_ReplicaManager_$1_OneMinuteRate
+    type: GAUGE
+
+  - pattern: 'kafka.controller<type=KafkaController, name=(ActiveControllerCount|OfflinePartitionsCount)><>Value'
+    name: kafka_controller_KafkaController_$1
+    type: GAUGE
+
+  - pattern: 'kafka.server<type=KafkaServer, name=BrokerState><>Value'
+    name: kafka_server_KafkaServer_BrokerState
+    type: GAUGE
+
+  # ── Request handler idle (Confluent yml appends _total) ─────────────────────
+  - pattern: kafka.server<type=KafkaRequestHandlerPool, name=RequestHandlerAvgIdlePercent><>OneMinuteRate
+    name: kafka_server_kafkarequesthandlerpool_requesthandleravgidlepercent_total
+    type: GAUGE
+
+  # ── Generic fallback (Count|Value attributes) ───────────────────────────────
+  - pattern: kafka.(\w+)<type=(.+), name=(.+)><>(Count|Value)
+    name: kafka_$1_$2_$3
+    type: GAUGE

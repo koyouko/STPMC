@@ -22,15 +22,18 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -46,14 +49,24 @@ public class MetricsScraperService {
     private static final int SCRAPE_OVERALL_TIMEOUT_SECONDS = 120;
     private static final Pattern LABEL_PATTERN = Pattern.compile("(\\w+)=\"([^\"]*)\"");
 
-    // JMX metric that carries the Kafka cluster UUID as a label value
-    private static final String CLUSTER_ID_METRIC = "kafka_server_KafkaServer_ClusterId";
+    // JMX metric that carries the Kafka cluster UUID as a label value.
+    // Names are stored lowercase at parse time because the Confluent kafka_broker.yml
+    // sets `lowercaseOutputName: true` and `lowercaseOutputLabelNames: true`,
+    // which lowercases every metric name and label key (values stay as-is).
+    private static final String CLUSTER_ID_METRIC = "kafka_server_kafkaserver_clusterid";
+    private static final String CLUSTER_ID_LABEL = "clusterid";
 
     private final MetricsTargetRepository metricsTargetRepository;
     private final ClusterService clusterService;
     private final HttpClient httpClient;
     private final boolean allowLoopback;
     private final ExecutorService metricsScraperExecutor;
+    private final long scrapeIntervalMs;
+    /** In-memory cache of the most recent {@link #scrapeAll()} result.
+     *  Read path ({@code GET /last-scrape}) lets the UI render sidebar
+     *  broker lists and the cluster-page inventory panel without triggering
+     *  a fresh scrape on every page load. Cleared only by process restart. */
+    private final AtomicReference<ApiDtos.MetricsScrapeResponse> lastScrape = new AtomicReference<>();
 
     public MetricsScraperService(MetricsTargetRepository metricsTargetRepository,
                                  ClusterService clusterService,
@@ -66,6 +79,34 @@ public class MetricsScraperService {
                 .connectTimeout(Duration.ofMillis(SCRAPE_TIMEOUT_MS))
                 .build();
         this.metricsScraperExecutor = metricsScraperExecutor;
+        this.scrapeIntervalMs = properties.metrics().scrapeIntervalMs();
+    }
+
+    /**
+     * Background auto-scrape. Runs every {@code app.metrics.scrape-interval-ms}
+     * milliseconds (0 disables). Uses {@code fixedDelayString}, so the next
+     * run waits for the previous one to complete — large target sets never
+     * stampede. First run is delayed by
+     * {@code app.metrics.scrape-initial-delay-ms} to let the app settle.
+     *
+     * <p>Skips quietly when no targets are configured, when the interval is
+     * {@code <= 0}, or when any exception occurs (logged at WARN; next tick
+     * retries normally).
+     */
+    @Scheduled(
+            fixedDelayString = "${app.metrics.scrape-interval-ms:60000}",
+            initialDelayString = "${app.metrics.scrape-initial-delay-ms:30000}"
+    )
+    public void scheduledScrape() {
+        if (scrapeIntervalMs <= 0) return;
+        try {
+            long targetCount = metricsTargetRepository.count();
+            if (targetCount == 0) return;
+            log.info("Scheduled scrape starting ({} targets)", targetCount);
+            scrapeAll();
+        } catch (Exception e) {
+            log.warn("Scheduled scrape failed: {}", e.getMessage());
+        }
     }
 
     // ── Inventory management ──────────────────────────────────────────
@@ -203,19 +244,42 @@ public class MetricsScraperService {
                     .toList();
         }
 
-        // Group by discoveredClusterId (null key = unreachable / unknown)
+        // Group by the CSV-provided clusterName. JMX-derived cluster ID is kept
+        // per-broker as a diagnostic but is no longer the grouping key, because
+        // the typical Confluent kafka_broker.yml does not expose ClusterId as a
+        // labeled metric (it is a String JMX attribute and requires a specific
+        // value/label rule). Name-based grouping works as soon as the CSV is
+        // uploaded, regardless of exporter configuration.
+        Map<UUID, String> targetIdToClusterName = targets.stream()
+                .collect(Collectors.toMap(
+                        MetricsTarget::getId,
+                        t -> t.getClusterName() != null ? t.getClusterName() : "",
+                        (a, b) -> a,
+                        LinkedHashMap::new
+                ));
+
         Map<String, List<ApiDtos.BrokerMetricsSample>> grouped = samples.stream()
                 .collect(Collectors.groupingBy(
-                        s -> s.discoveredClusterId() != null ? s.discoveredClusterId() : "",
+                        s -> {
+                            String name = targetIdToClusterName.get(s.targetId());
+                            return name != null ? name : "";
+                        },
                         LinkedHashMap::new,
                         Collectors.toList()
                 ));
 
         List<ApiDtos.DiscoveredCluster> clusters = grouped.entrySet().stream()
-                .map(e -> new ApiDtos.DiscoveredCluster(
-                        e.getKey().isEmpty() ? null : e.getKey(),
-                        e.getValue()
-                ))
+                .map(e -> {
+                    String groupName = e.getKey().isEmpty() ? null : e.getKey();
+                    // Prefer a non-null JMX cluster ID from any broker in this group,
+                    // so the UI can display it as a secondary identifier if present.
+                    String jmxId = e.getValue().stream()
+                            .map(ApiDtos.BrokerMetricsSample::discoveredClusterId)
+                            .filter(s -> s != null && !s.isBlank())
+                            .findFirst()
+                            .orElse(null);
+                    return new ApiDtos.DiscoveredCluster(groupName, jmxId, e.getValue());
+                })
                 .toList();
 
         // Write back discoveredClusterId to each target and persist
@@ -225,7 +289,24 @@ public class MetricsScraperService {
         // if one doesn't already exist, using the first reachable broker as bootstrap
         autoOnboardDiscoveredClusters(clusters, targets);
 
-        return new ApiDtos.MetricsScrapeResponse(scrapedAt, clusters);
+        ApiDtos.MetricsScrapeResponse response = new ApiDtos.MetricsScrapeResponse(scrapedAt, clusters);
+        lastScrape.set(response);
+        return response;
+    }
+
+    /**
+     * Returns the most recent scrape result produced by {@link #scrapeAll()},
+     * or empty if no scrape has been performed since process startup.
+     * Used by the sidebar and cluster-detail pages to render broker inventory
+     * without triggering a fresh scrape on every navigation.
+     */
+    public Optional<ApiDtos.MetricsScrapeResponse> getLastScrape() {
+        return Optional.ofNullable(lastScrape.get());
+    }
+
+    /** Configured background auto-scrape interval in ms; 0 when disabled. */
+    public long getScrapeIntervalMs() {
+        return scrapeIntervalMs;
     }
 
     private void writeBackDiscoveredClusterIds(List<MetricsTarget> targets,
@@ -329,7 +410,9 @@ public class MetricsScraperService {
             try {
                 double value = Double.parseDouble(valueStr);
                 if (!Double.isNaN(value) && !Double.isInfinite(value)) {
-                    samples.add(new MetricSample(metricName, labels, value));
+                    // Normalize metric name to lowercase so lookups match regardless
+                    // of whether the exporter was configured with lowercaseOutputName.
+                    samples.add(new MetricSample(metricName.toLowerCase(), labels, value));
                 }
             } catch (NumberFormatException ignored) {
                 // skip unparseable lines
@@ -343,7 +426,8 @@ public class MetricsScraperService {
         Map<String, String> labels = new LinkedHashMap<>();
         Matcher matcher = LABEL_PATTERN.matcher(labelStr);
         while (matcher.find()) {
-            labels.put(matcher.group(1), matcher.group(2));
+            // Lowercase label keys; keep values as-is (label values carry data like "heap")
+            labels.put(matcher.group(1).toLowerCase(), matcher.group(2));
         }
         return labels;
     }
@@ -356,26 +440,28 @@ public class MetricsScraperService {
      */
     private String extractClusterId(List<MetricSample> samples) {
         return samples.stream()
-                .filter(s -> s.name().equals(CLUSTER_ID_METRIC) && s.labels().containsKey("clusterId"))
+                .filter(s -> s.name().equals(CLUSTER_ID_METRIC) && s.labels().containsKey(CLUSTER_ID_LABEL))
                 .findFirst()
-                .map(s -> s.labels().get("clusterId"))
+                .map(s -> s.labels().get(CLUSTER_ID_LABEL))
                 .orElse(null);
     }
 
     /**
      * Returns the value for a metric without a topic label (all-topics aggregate).
-     * Falls back to the first matching sample if no unlabeled version exists.
+     * Accepts a list of candidate names (e.g. with and without a {@code _total} suffix,
+     * which some JMX exporter rule sets append). Returns the first match.
      */
-    private double getAggregateMetric(List<MetricSample> samples, String name) {
-        return samples.stream()
-                .filter(s -> s.name().equals(name) && !s.labels().containsKey("topic"))
-                .findFirst()
-                .map(MetricSample::value)
-                .orElseGet(() -> samples.stream()
-                        .filter(s -> s.name().equals(name))
-                        .findFirst()
-                        .map(MetricSample::value)
-                        .orElse(-1.0));
+    private double getAggregateMetric(List<MetricSample> samples, String... candidateNames) {
+        for (String name : candidateNames) {
+            var match = samples.stream()
+                    .filter(s -> s.name().equals(name) && !s.labels().containsKey("topic"))
+                    .findFirst()
+                    .or(() -> samples.stream()
+                            .filter(s -> s.name().equals(name))
+                            .findFirst());
+            if (match.isPresent()) return match.get().value();
+        }
+        return -1.0;
     }
 
     /** Returns the value for a metric filtered by a specific label match. */
@@ -394,37 +480,55 @@ public class MetricsScraperService {
 
         String discoveredClusterId = extractClusterId(samples);
 
+        // All metric names here are lowercase because parsePrometheusText() lowercases
+        // at parse time. Some Confluent kafka_broker.yml rules append a _total suffix
+        // (e.g. requesthandleravgidlepercent_total), so we pass candidate variants.
         double messagesInPerSec = getAggregateMetric(samples,
-                "kafka_server_BrokerTopicMetrics_MessagesInPerSec_OneMinuteRate");
+                "kafka_server_brokertopicmetrics_messagesinpersec_oneminuterate");
         double bytesInPerSec = getAggregateMetric(samples,
-                "kafka_server_BrokerTopicMetrics_BytesInPerSec_OneMinuteRate");
+                "kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate");
         double bytesOutPerSec = getAggregateMetric(samples,
-                "kafka_server_BrokerTopicMetrics_BytesOutPerSec_OneMinuteRate");
+                "kafka_server_brokertopicmetrics_bytesoutpersec_oneminuterate");
 
         double underReplicatedPartitions = getAggregateMetric(samples,
-                "kafka_server_ReplicaManager_UnderReplicatedPartitions");
+                "kafka_server_replicamanager_underreplicatedpartitions",
+                "kafka_server_replicamanager_underreplicatedpartitions_value");
         double activeControllerCount = getAggregateMetric(samples,
-                "kafka_controller_KafkaController_ActiveControllerCount");
+                "kafka_controller_kafkacontroller_activecontrollercount",
+                "kafka_controller_kafkacontroller_activecontrollercount_value");
         double offlinePartitionsCount = getAggregateMetric(samples,
-                "kafka_controller_KafkaController_OfflinePartitionsCount");
+                "kafka_controller_kafkacontroller_offlinepartitionscount",
+                "kafka_controller_kafkacontroller_offlinepartitionscount_value");
         double brokerState = getAggregateMetric(samples,
-                "kafka_server_KafkaServer_BrokerState");
+                "kafka_server_kafkaserver_brokerstate",
+                "kafka_server_kafkaserver_brokerstate_value");
 
         double leaderCount = getAggregateMetric(samples,
-                "kafka_server_ReplicaManager_LeaderCount");
+                "kafka_server_replicamanager_leadercount",
+                "kafka_server_replicamanager_leadercount_value");
         double partitionCount = getAggregateMetric(samples,
-                "kafka_server_ReplicaManager_PartitionCount");
+                "kafka_server_replicamanager_partitioncount",
+                "kafka_server_replicamanager_partitioncount_value");
 
         double isrShrinksPerSec = getAggregateMetric(samples,
-                "kafka_server_ReplicaManager_IsrShrinksPerSec_OneMinuteRate");
+                "kafka_server_replicamanager_isrshrinkspersec_oneminuterate");
         double isrExpandsPerSec = getAggregateMetric(samples,
-                "kafka_server_ReplicaManager_IsrExpandsPerSec_OneMinuteRate");
+                "kafka_server_replicamanager_isrexpandspersec_oneminuterate");
 
         double requestHandlerIdle = getAggregateMetric(samples,
-                "kafka_server_KafkaRequestHandlerPool_RequestHandlerAvgIdlePercent");
+                "kafka_server_kafkarequesthandlerpool_requesthandleravgidlepercent_total",
+                "kafka_server_kafkarequesthandlerpool_requesthandleravgidlepercent");
 
         double heapUsedBytes = getLabeledMetric(samples, "jvm_memory_bytes_used", "area", "heap");
         double heapMaxBytes = getLabeledMetric(samples, "jvm_memory_bytes_max", "area", "heap");
+
+        // Uptime — Prometheus JMX exporter exposes the JVM process start time
+        // (unix seconds). Convert to elapsed seconds; -1 if the metric wasn't
+        // found (e.g. non-JMX-exporter target).
+        double processStartTimeSec = getAggregateMetric(samples, "process_start_time_seconds");
+        double uptimeSeconds = processStartTimeSec > 0
+                ? Math.max(0, (double) Instant.now().getEpochSecond() - processStartTimeSec)
+                : -1;
 
         return new ApiDtos.BrokerMetricsSample(
                 target.getId(),
@@ -449,21 +553,32 @@ public class MetricsScraperService {
                 isrExpandsPerSec,
                 requestHandlerIdle,
                 heapUsedBytes,
-                heapMaxBytes
+                heapMaxBytes,
+                uptimeSeconds
         );
     }
 
     /**
      * Auto-onboards discovered clusters that don't already exist in the system.
-     * Uses the first reachable broker in each cluster group as the bootstrap listener.
+     *
+     * <p>Identity rule: prefer the JMX-derived cluster ID when present; otherwise
+     * fall back to the CSV-provided clusterName. This lets auto-onboarding work
+     * even when the Prometheus JMX exporter doesn't expose
+     * {@code kafka_server_KafkaServer_ClusterId} (a String JMX attribute that
+     * requires an explicit value/label rule in kafka_broker.yml).
+     *
+     * <p>Groups with neither a JMX cluster ID nor a clusterName are skipped.
      */
     private void autoOnboardDiscoveredClusters(List<ApiDtos.DiscoveredCluster> discoveredClusters,
                                                 List<MetricsTarget> targets) {
         for (ApiDtos.DiscoveredCluster dc : discoveredClusters) {
-            if (dc.clusterId() == null) continue;
+            // Identity: JMX cluster ID preferred; clusterName is the fallback.
+            if (dc.clusterId() == null && dc.clusterName() == null) continue;
 
-            // Check if a cluster with this JMX cluster ID already exists
-            if (clusterService.existsByJmxClusterId(dc.clusterId())) continue;
+            boolean alreadyExists = dc.clusterId() != null
+                    ? clusterService.existsByJmxClusterId(dc.clusterId())
+                    : clusterService.clusterNameExists(dc.clusterName());
+            if (alreadyExists) continue;
 
             ApiDtos.BrokerMetricsSample firstBroker = dc.brokers().stream()
                     .filter(ApiDtos.BrokerMetricsSample::reachable)
@@ -471,26 +586,31 @@ public class MetricsScraperService {
                     .orElse(null);
             if (firstBroker == null) continue;
 
-            // Look up clusterName and environment from the matching MetricsTarget
             MetricsTarget matchingTarget = targets.stream()
                     .filter(t -> t.getId().equals(firstBroker.targetId()))
                     .findFirst()
                     .orElse(null);
 
-            String clusterName = matchingTarget != null && matchingTarget.getClusterName() != null
-                    ? matchingTarget.getClusterName()
-                    : "Discovered: " + dc.clusterId();
+            String clusterName = dc.clusterName() != null
+                    ? dc.clusterName()
+                    : (matchingTarget != null && matchingTarget.getClusterName() != null
+                            ? matchingTarget.getClusterName()
+                            : "Discovered: " + dc.clusterId());
             // Map target environment to binary cluster classification:
             // "PROD" → PROD, everything else (DEV, SIT, UAT, PTE, etc.) → NON_PROD
             ClusterEnvironment env = matchingTarget != null && "PROD".equalsIgnoreCase(matchingTarget.getEnvironment())
                     ? ClusterEnvironment.PROD
                     : ClusterEnvironment.NON_PROD;
 
+            String notes = dc.clusterId() != null
+                    ? "Auto-discovered from JMX scrape. Cluster ID: " + dc.clusterId()
+                    : "Auto-discovered from scrape. Grouped by CSV clusterName (no JMX cluster ID exposed).";
+
             try {
                 var request = new ApiDtos.CreateClusterRequest(
                         clusterName,
                         env,
-                        "Auto-discovered from JMX scrape. Cluster ID: " + dc.clusterId(),
+                        notes,
                         List.of(new ApiDtos.ClusterListenerRequest(
                                 "jmx-discovered",
                                 firstBroker.host(),
@@ -506,11 +626,15 @@ public class MetricsScraperService {
                         List.of()
                 );
                 Cluster created = clusterService.createCluster(request, "jmx-auto-discovery");
-                created.setJmxClusterId(dc.clusterId());
-                clusterService.saveCluster(created);
-                log.info("Auto-onboarded cluster '{}' from JMX discovery", clusterName);
+                if (dc.clusterId() != null) {
+                    created.setJmxClusterId(dc.clusterId());
+                    clusterService.saveCluster(created);
+                }
+                log.info("Auto-onboarded cluster '{}' (jmxClusterId={})",
+                        clusterName, dc.clusterId() != null ? dc.clusterId() : "<none>");
             } catch (Exception e) {
-                log.warn("Failed to auto-onboard cluster {}: {}", dc.clusterId(), e.getMessage());
+                log.warn("Failed to auto-onboard cluster '{}' (jmxClusterId={}): {}",
+                        clusterName, dc.clusterId(), e.getMessage());
             }
         }
     }
@@ -556,7 +680,7 @@ public class MetricsScraperService {
                 errorMessage,
                 Instant.now(),
                 latencyMs,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
+                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
         );
     }
 }

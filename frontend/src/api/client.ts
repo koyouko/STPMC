@@ -158,6 +158,19 @@ export const apiClient = {
     return request<MetricsScrapeResponse>('/api/platform/metrics/scrape')
   },
 
+  /**
+   * Returns the most recent scrape snapshot held in server memory, or
+   * undefined (HTTP 204) if no scrape has run since process startup.
+   */
+  getLastScrape(): Promise<MetricsScrapeResponse | undefined> {
+    return request<MetricsScrapeResponse>('/api/platform/metrics/last-scrape') as Promise<MetricsScrapeResponse | undefined>
+  },
+
+  /** Returns client-facing scraper config (currently just the auto-scrape interval). */
+  getMetricsConfig() {
+    return request<{ scrapeIntervalMs: number }>('/api/platform/metrics/config')
+  },
+
   // ── Audit ──────────────────────────────────────────────────────────
 
   getAuditEvents(page: number = 0, size: number = 50, search?: string) {

@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiClient } from '../api/client'
 import type { BrokerMetricsSample, DiscoveredCluster, MetricsScrapeResponse } from '../types/api'
+import { useOutletContext } from 'react-router-dom'
+import { brokerHealth, brokerStateName, fmtElapsedSince, fmtInterval, fmtUptime, HEALTH_COLORS, rollupCluster } from '../utils/brokerHealth'
+import type { DashboardContext } from '../layouts/AppLayout'
 
 // ── Helpers ───────────────────────────────────────────────────────
 
@@ -29,11 +32,9 @@ function fmtPct(v: number): string {
   return `${(v * 100).toFixed(1)}%`
 }
 
-function brokerStateName(state: number): string {
-  if (state < 0) return '—'
-  const names: Record<number, string> = { 0: 'Unknown', 1: 'Starting', 2: 'Recovery', 3: 'Running', 6: 'PendingShutdown', 7: 'Shutdown' }
-  return names[Math.round(state)] ?? String(Math.round(state))
-}
+// brokerStateName, brokerHealth, fmtUptime, rollupCluster, HEALTH_COLORS are
+// imported from ../utils/brokerHealth for reuse across sidebar / cluster
+// detail / broker detail pages.
 
 // ── Metric row inside a card ───────────────────────────────────────
 
@@ -69,16 +70,18 @@ function MetricRow({ label, value, alert }: { label: string; value: string; aler
 function BrokerMetricsCard({ sample }: { sample: BrokerMetricsSample }) {
   const heapPct = sample.heapMaxBytes > 0 ? sample.heapUsedBytes / sample.heapMaxBytes : -1
   const isController = sample.activeControllerCount === 1
+  const health = brokerHealth(sample)
+  const { bg: badgeBg, fg: badgeFg } = HEALTH_COLORS[health.label]
 
   return (
     <div
       className="panel"
       style={{ padding: '1rem', opacity: sample.reachable ? 1 : 0.6 }}
     >
-      {/* Card header */}
+      {/* Card header — hostname is primary, role/controller is the eyebrow */}
       <div style={{ marginBottom: '0.75rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <span
               style={{
                 fontSize: '0.7rem',
@@ -95,27 +98,28 @@ function BrokerMetricsCard({ sample }: { sample: BrokerMetricsSample }) {
                 </span>
               )}
             </span>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem', marginTop: '0.1rem' }}>{sample.discoveredClusterId ?? sample.host}</div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', marginTop: '0.1rem', wordBreak: 'break-all' }}>
+              {sample.host}
+            </div>
             <div style={{ color: 'var(--color-muted)', fontSize: '0.75rem' }}>
-              {sample.host}:{sample.metricsPort}
+              port {sample.metricsPort} · {sample.reachable ? `${sample.latencyMs} ms scrape` : 'scrape failed'}
             </div>
           </div>
 
-          {/* Reachability badge */}
+          {/* Composite health badge */}
           <span
+            title={health.reasons.length > 0 ? health.reasons.join(', ') : 'All signals healthy'}
             style={{
               padding: '0.2rem 0.5rem',
               borderRadius: '999px',
               fontSize: '0.7rem',
-              fontWeight: 600,
-              background: sample.reachable
-                ? 'rgba(34,197,94,0.15)'
-                : 'rgba(239,68,68,0.15)',
-              color: sample.reachable ? '#16a34a' : '#dc2626',
+              fontWeight: 700,
+              background: badgeBg,
+              color: badgeFg,
               whiteSpace: 'nowrap',
             }}
           >
-            {sample.reachable ? `${sample.latencyMs} ms` : 'Unreachable'}
+            {health.label}
           </span>
         </div>
 
@@ -133,6 +137,21 @@ function BrokerMetricsCard({ sample }: { sample: BrokerMetricsSample }) {
             {sample.errorMessage}
           </div>
         )}
+
+        {health.label === 'Degraded' && health.reasons.length > 0 && (
+          <div
+            style={{
+              marginTop: '0.5rem',
+              fontSize: '0.75rem',
+              color: '#b45309',
+              background: 'rgba(234,179,8,0.08)',
+              borderRadius: '4px',
+              padding: '0.4rem 0.6rem',
+            }}
+          >
+            Issues: {health.reasons.join(', ')}
+          </div>
+        )}
       </div>
 
       {sample.reachable && (
@@ -146,6 +165,11 @@ function BrokerMetricsCard({ sample }: { sample: BrokerMetricsSample }) {
           {/* Health */}
           <div style={{ marginTop: '0.6rem', marginBottom: '0.25rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-muted)', letterSpacing: '0.06em' }}>Health</div>
           <MetricRow
+            label="Broker state"
+            value={brokerStateName(sample.brokerState)}
+            alert={sample.brokerState >= 0 && Math.round(sample.brokerState) !== 3}
+          />
+          <MetricRow
             label="Under-replicated partitions"
             value={fmtInt(sample.underReplicatedPartitions)}
             alert={sample.underReplicatedPartitions > 0}
@@ -155,7 +179,7 @@ function BrokerMetricsCard({ sample }: { sample: BrokerMetricsSample }) {
             value={fmtInt(sample.offlinePartitionsCount)}
             alert={sample.offlinePartitionsCount > 0}
           />
-          <MetricRow label="Broker state" value={brokerStateName(sample.brokerState)} />
+          <MetricRow label="Uptime" value={fmtUptime(sample.uptimeSeconds)} />
           <MetricRow
             label="ISR shrinks/sec"
             value={fmtRate(sample.isrShrinksPerSec, '/s')}
@@ -192,21 +216,35 @@ function BrokerMetricsCard({ sample }: { sample: BrokerMetricsSample }) {
 // ── Cluster group section ─────────────────────────────────────────
 
 function ClusterSection({ group }: { group: DiscoveredCluster }) {
-  const reachable = group.brokers.filter((b) => b.reachable).length
-  const total = group.brokers.length
+  const rollup = rollupCluster(group)
+  const { total, reachable, healthy, totalUrp, totalOffline, controllerHost } = rollup
 
   return (
     <section style={{ marginBottom: '2rem' }}>
-      <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap' }}>
+      <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'baseline', gap: '1.5rem', flexWrap: 'wrap' }}>
         <div>
-          <span className="eyebrow">{group.clusterId ? 'Cluster' : 'Unreachable / Unknown'}</span>
-          <h2 style={{ margin: 0, fontSize: '1rem', fontFamily: 'monospace', letterSpacing: '-0.01em' }}>
-            {group.clusterId ?? '—'}
+          <span className="eyebrow">{group.clusterName ? 'Cluster' : 'Unnamed / Unreachable'}</span>
+          <h2 style={{ margin: 0, fontSize: '1rem', letterSpacing: '-0.01em' }}>
+            {group.clusterName ?? '—'}
           </h2>
+          {group.clusterId && (
+            <div style={{ color: 'var(--color-muted)', fontSize: '0.75rem', fontFamily: 'monospace', marginTop: '0.15rem' }}>
+              JMX ID: {group.clusterId}
+            </div>
+          )}
         </div>
-        <span style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>
-          {reachable} / {total} brokers reachable
-        </span>
+        <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--color-muted)' }}>
+          <span>
+            <strong style={{ color: healthy === total ? '#16a34a' : '#b45309' }}>{healthy}</strong>
+            {' / '}{total} healthy
+          </span>
+          <span>{reachable} / {total} reachable</span>
+          <span style={{ color: Math.round(totalUrp) > 0 ? '#dc2626' : 'inherit' }}>URP {Math.round(totalUrp)}</span>
+          <span style={{ color: Math.round(totalOffline) > 0 ? '#dc2626' : 'inherit' }}>Offline {Math.round(totalOffline)}</span>
+          {controllerHost && (
+            <span>Controller: <code style={{ fontFamily: 'monospace' }}>{controllerHost}</code></span>
+          )}
+        </div>
       </div>
 
       <div
@@ -223,6 +261,9 @@ function ClusterSection({ group }: { group: DiscoveredCluster }) {
 
 // ── Main page ─────────────────────────────────────────────────────
 
+const PAGE_SIZE_OPTIONS = [20, 50, 100] as const
+const DEFAULT_PAGE_SIZE = 50
+
 export default function MetricsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -231,6 +272,9 @@ export default function MetricsPage() {
   const [uploading, setUploading] = useState(false)
   const [scraping, setScraping] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
+  const { scrapeIntervalMs } = useOutletContext<DashboardContext>()
 
   useEffect(() => {
     void loadTargets()
@@ -255,6 +299,7 @@ export default function MetricsPage() {
       const result = await apiClient.uploadMetricsInventory(file)
       setTargets(result)
       setScrapeResult(null)
+      setCurrentPage(1)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
@@ -290,7 +335,20 @@ export default function MetricsPage() {
     (acc, c) => acc + c.brokers.filter((b) => b.reachable).length,
     0,
   ) ?? 0
-  const discoveredClusterCount = scrapeResult?.clusters.filter((c) => c.clusterId !== null).length ?? 0
+  const discoveredClusterCount = scrapeResult?.clusters.filter((c) => c.clusterName !== null).length ?? 0
+
+  // Sort once per render; slicing into pages is O(pageSize) downstream.
+  const sortedTargets = [...targets].sort((a, b) =>
+    (a.clusterName ?? '').localeCompare(b.clusterName ?? ''),
+  )
+  const totalPages = Math.max(1, Math.ceil(sortedTargets.length / pageSize))
+  // Clamp if a Remove left the current page out of range.
+  const safePage = Math.min(currentPage, totalPages)
+  const pageStart = (safePage - 1) * pageSize
+  const pageTargets = sortedTargets.slice(pageStart, pageStart + pageSize)
+  useEffect(() => {
+    if (currentPage !== safePage) setCurrentPage(safePage)
+  }, [currentPage, safePage])
 
   return (
     <>
@@ -299,10 +357,10 @@ export default function MetricsPage() {
           <span className="eyebrow">Inventory</span>
           <h1>Inventory</h1>
           <p>
-            Upload a broker inventory CSV, then click <strong>Scrape Now</strong>. Each broker's
-            cluster ID is read automatically from the{' '}
-            <code>kafka_server_KafkaServer_ClusterId</code> JMX metric — no manual cluster
-            registration required.
+            Upload a broker inventory CSV, then click <strong>Scrape Now</strong>. Brokers are
+            grouped by the <code>clusterName</code> column in the CSV. If the JMX exporter
+            exposes <code>kafka_server_KafkaServer_ClusterId</code>, the discovered ID is shown
+            alongside the name as a secondary identifier.
           </p>
         </div>
         <div className="hero__actions">
@@ -377,9 +435,7 @@ Dev Cluster,localhost,4000,BROKER,NON_PROD`}</pre>
               </tr>
             </thead>
             <tbody>
-              {[...targets]
-                .sort((a, b) => (a.clusterName ?? '').localeCompare(b.clusterName ?? ''))
-                .map((t) => (
+              {pageTargets.map((t) => (
                 <tr key={t.targetId}>
                   <td>{t.clusterName ?? <span style={{ color: 'var(--color-muted)', fontStyle: 'italic' }}>—</span>}</td>
                   <td>
@@ -412,6 +468,87 @@ Dev Cluster,localhost,4000,BROKER,NON_PROD`}</pre>
             </tbody>
           </table>
         )}
+
+        {targets.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '1rem',
+              marginTop: '0.75rem',
+              flexWrap: 'wrap',
+              fontSize: '0.85rem',
+              color: 'var(--color-muted)',
+            }}
+          >
+            <div>
+              Showing <strong>{sortedTargets.length === 0 ? 0 : pageStart + 1}</strong>–
+              <strong>{pageStart + pageTargets.length}</strong> of{' '}
+              <strong>{sortedTargets.length}</strong>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <label>
+                Per page:{' '}
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value))
+                    setCurrentPage(1)
+                  }}
+                  style={{ padding: '0.2rem 0.4rem' }}
+                >
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  style={{ padding: '0.2rem 0.6rem', fontSize: '0.78rem' }}
+                  onClick={() => setCurrentPage(1)}
+                  disabled={safePage <= 1}
+                >
+                  « First
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  style={{ padding: '0.2rem 0.6rem', fontSize: '0.78rem' }}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                >
+                  ‹ Prev
+                </button>
+                <span style={{ minWidth: '5rem', textAlign: 'center' }}>
+                  Page <strong>{safePage}</strong> / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  style={{ padding: '0.2rem 0.6rem', fontSize: '0.78rem' }}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                >
+                  Next ›
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  style={{ padding: '0.2rem 0.6rem', fontSize: '0.78rem' }}
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={safePage >= totalPages}
+                >
+                  Last »
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ── Scrape results ──────────────────────────────────────── */}
@@ -425,12 +562,13 @@ Dev Cluster,localhost,4000,BROKER,NON_PROD`}</pre>
               </h2>
             </div>
             <small style={{ color: 'var(--color-muted)' }}>
-              at {new Date(scrapeResult.scrapedAt).toLocaleTimeString()}
+              at {new Date(scrapeResult.scrapedAt).toLocaleTimeString()} · {fmtElapsedSince(scrapeResult.scrapedAt)}
+              {scrapeIntervalMs > 0 && <> · auto-refresh every {fmtInterval(scrapeIntervalMs)}</>}
             </small>
           </div>
 
           {scrapeResult.clusters.map((group, i) => (
-            <ClusterSection key={group.clusterId ?? `unknown-${i}`} group={group} />
+            <ClusterSection key={group.clusterName ?? group.clusterId ?? `unknown-${i}`} group={group} />
           ))}
         </section>
       )}

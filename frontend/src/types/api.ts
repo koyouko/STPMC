@@ -226,10 +226,15 @@ export interface BrokerMetricsSample {
   requestHandlerIdle: number
   heapUsedBytes: number
   heapMaxBytes: number
+  /** Broker JVM uptime in seconds; -1 when unknown. */
+  uptimeSeconds: number
 }
 
-/** A Kafka cluster auto-discovered by grouping brokers with the same cluster ID from JMX. */
+/** A Kafka cluster group produced by a scrape. Brokers are grouped by the
+ *  CSV-provided `clusterName`; `clusterId` is optionally populated from the
+ *  JMX `kafka_server_KafkaServer_ClusterId` metric when the exporter exposes it. */
 export interface DiscoveredCluster {
+  clusterName: string | null
   clusterId: string | null
   brokers: BrokerMetricsSample[]
 }

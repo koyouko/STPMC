@@ -296,16 +296,23 @@ public final class ApiDtos {
             double isrExpandsPerSec,
             double requestHandlerIdle,
             double heapUsedBytes,
-            double heapMaxBytes
+            double heapMaxBytes,
+            /** Broker JVM uptime in seconds (now - process_start_time_seconds). -1 if unknown. */
+            double uptimeSeconds
     ) {
     }
 
     /**
-     * A Kafka cluster discovered by grouping brokers that returned the same
-     * {@code kafka_server_KafkaServer_ClusterId} label from their JMX scrape.
-     * {@code clusterId} is null for unreachable or non-Kafka targets.
+     * A Kafka cluster group produced by a scrape.
+     *
+     * <p>Brokers are grouped by their CSV-provided {@code clusterName}, which is
+     * the primary identifier for the UI. {@code clusterId} may additionally be
+     * populated when the JMX exporter exposes
+     * {@code kafka_server_KafkaServer_ClusterId} — otherwise it is null and the
+     * group is identified purely by name.
      */
     public record DiscoveredCluster(
+            String clusterName,
             String clusterId,
             List<BrokerMetricsSample> brokers
     ) {

@@ -28,7 +28,11 @@ public record AppProperties(
     }
 
     public record Metrics(
-            int scrapeTimeoutMs
+            int scrapeTimeoutMs,
+            /** Background auto-scrape interval in ms; 0 disables auto-scraping. */
+            long scrapeIntervalMs,
+            /** Delay before the first auto-scrape after application startup, in ms. */
+            long scrapeInitialDelayMs
     ) {
     }
 

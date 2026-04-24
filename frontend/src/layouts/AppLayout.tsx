@@ -5,6 +5,7 @@ import { SidebarTree } from '../components/SidebarTree'
 import type {
   ClusterEnvironment,
   ClusterHealthSummaryResponse,
+  MetricsScrapeResponse,
   ServiceAccountResponse,
 } from '../types/api'
 
@@ -17,10 +18,15 @@ export interface DashboardContext {
   filter: FilterMode
   loading: boolean
   error: string | null
+  /** Latest scrape snapshot (from /last-scrape), used by sidebar + cluster pages. */
+  lastScrape: MetricsScrapeResponse | undefined
+  /** Background auto-scrape interval in ms (0 = disabled). */
+  scrapeIntervalMs: number
   setFilter: (filter: FilterMode) => void
   setServiceAccounts: (accounts: ServiceAccountResponse[]) => void
   setError: (error: string | null) => void
   reloadClusters: () => Promise<void>
+  reloadLastScrape: () => Promise<void>
 }
 
 export function AppLayout() {
@@ -31,6 +37,8 @@ export function AppLayout() {
   const [filter, setFilter] = useState<FilterMode>('ALL')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [lastScrape, setLastScrape] = useState<MetricsScrapeResponse | undefined>(undefined)
+  const [scrapeIntervalMs, setScrapeIntervalMs] = useState<number>(0)
 
   const selectedClusterId = params.clusterId ?? null
 
@@ -38,12 +46,16 @@ export function AppLayout() {
     setLoading(true)
     setError(null)
     try {
-      const [clusterResponse, accountResponse] = await Promise.all([
+      const [clusterResponse, accountResponse, scrapeResponse, metricsConfig] = await Promise.all([
         apiClient.listClusters(),
         apiClient.listServiceAccounts(),
+        apiClient.getLastScrape().catch(() => undefined),
+        apiClient.getMetricsConfig().catch(() => ({ scrapeIntervalMs: 0 })),
       ])
       setClusters(clusterResponse)
       setServiceAccounts(accountResponse)
+      setLastScrape(scrapeResponse)
+      setScrapeIntervalMs(metricsConfig?.scrapeIntervalMs ?? 0)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load dashboard')
     } finally {
@@ -60,9 +72,31 @@ export function AppLayout() {
     }
   }
 
+  async function reloadLastScrape() {
+    try {
+      const scrapeResponse = await apiClient.getLastScrape()
+      setLastScrape(scrapeResponse)
+    } catch {
+      // non-fatal — sidebar will just fall back to cluster-name-only rendering
+    }
+  }
+
   useEffect(() => {
     void loadDashboard()
   }, [])
+
+  // Poll /last-scrape + /clusters to keep sidebar, cluster list, and
+  // cluster pages fresh. Auto-onboarding can create new clusters on a
+  // scheduled scrape, so both lists must refresh. Disabled when interval=0.
+  useEffect(() => {
+    if (scrapeIntervalMs <= 0) return
+    const pollMs = Math.max(5_000, Math.floor(scrapeIntervalMs / 2))
+    const id = window.setInterval(() => {
+      void reloadLastScrape()
+      void reloadClusters()
+    }, pollMs)
+    return () => window.clearInterval(id)
+  }, [scrapeIntervalMs])
 
   const filteredClusters = useMemo(() => {
     if (filter === 'ALL') return clusters
@@ -88,6 +122,11 @@ export function AppLayout() {
     void navigate(`/clusters/${clusterId}`)
   }
 
+  function handleSelectBroker(clusterId: string, targetId: string, environment?: ClusterEnvironment) {
+    if (environment) setFilter(environment)
+    void navigate(`/clusters/${clusterId}/brokers/${targetId}`)
+  }
+
   const dashboardContext: DashboardContext = {
     clusters,
     filteredClusters,
@@ -95,10 +134,13 @@ export function AppLayout() {
     filter,
     loading,
     error,
+    lastScrape,
+    scrapeIntervalMs,
     setFilter,
     setServiceAccounts,
     setError,
     reloadClusters,
+    reloadLastScrape,
   }
 
   return (
@@ -118,10 +160,13 @@ export function AppLayout() {
             activeEnvironment={filter}
             selectedClusterId={selectedClusterId}
             focusedComponentKind={null}
+            scrape={lastScrape}
+            selectedTargetId={params.targetId ?? null}
             onShowOverview={handleShowOverview}
             onSelectEnvironment={handleSelectEnvironment}
             onSelectCluster={handleSelectCluster}
             onSelectComponent={handleSelectComponent}
+            onSelectBroker={handleSelectBroker}
             onMetrics={() => void navigate('/metrics')}
             onAuditLog={() => void navigate('/audit')}
           />

@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -76,6 +77,26 @@ public class MetricsController {
     @GetMapping("/scrape")
     public ApiDtos.MetricsScrapeResponse scrapeAll() {
         return metricsScraperService.scrapeAll();
+    }
+
+    /**
+     * Returns the most recent in-memory scrape snapshot. 204 if no scrape has
+     * been run since process startup. Lets the sidebar and cluster-detail
+     * pages render broker inventory without triggering a fresh scrape.
+     */
+    @GetMapping("/last-scrape")
+    public ResponseEntity<ApiDtos.MetricsScrapeResponse> lastScrape() {
+        return metricsScraperService.getLastScrape()
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /** Client-facing scraper configuration (e.g. auto-scrape interval). */
+    @GetMapping("/config")
+    public java.util.Map<String, Object> config() {
+        return java.util.Map.of(
+                "scrapeIntervalMs", metricsScraperService.getScrapeIntervalMs()
+        );
     }
 
     private ApiDtos.MetricsTargetResponse toResponse(MetricsTarget target) {
