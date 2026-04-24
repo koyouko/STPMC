@@ -1,0 +1,23 @@
+# AKHQ (Kafka HQ) local-dev config.
+#
+# Web UI: http://localhost:9021
+# Points at the 3-broker KRaft cluster declared in docker-compose.yml.
+# Use container-side hostnames (kafka1/2/3:29092) since AKHQ runs on the
+# same docker network.
+
+akhq:
+  server:
+    access-log:
+      enabled: false
+
+  connections:
+    local-3-broker:
+      properties:
+        bootstrap.servers: "kafka1:29092,kafka2:29092,kafka3:29092"
+
+  ui-options:
+    topic:
+      default-view: ALL
+      skip-consumer-groups: false
+    topic-data:
+      sort: OLDEST

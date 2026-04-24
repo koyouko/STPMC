@@ -125,6 +125,27 @@ services:
       - ./config/kafka_broker.yml:/opt/jmx-exporter/kafka-config.yml:ro
       - kafka3-data:/var/lib/kafka/data
 
+  # ── AKHQ (Kafka HQ) web UI ────────────────────────────────────────────────
+  # Lightweight open-source Kafka admin UI for local dev. Replaces the heavier
+  # Confluent Control Center for inspection / topic browsing / consumer lag.
+  #   http://localhost:9021
+  # ──────────────────────────────────────────────────────────────────────────
+  akhq:
+    image: tchiotludo/akhq:0.25.1
+    restart: unless-stopped
+    container_name: lenseiq-akhq
+    hostname: akhq
+    environment:
+      MICRONAUT_CONFIG_FILES: /app/application.yml
+    ports:
+      - "127.0.0.1:9021:8080"
+    volumes:
+      - ./config/akhq.yml:/app/application.yml:ro
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+
 volumes:
   mission-control-postgres:
   kafka1-data:
