@@ -1,4 +1,10 @@
-import type { BrokerMetricsSample, DiscoveredCluster } from '../types/api'
+import type {
+  BrokerMetricsSample,
+  ClusterHealthSummaryResponse,
+  DiscoveredCluster,
+  HealthStatus,
+  MetricsScrapeResponse,
+} from '../types/api'
 
 export type BrokerHealthLabel = 'Healthy' | 'Degraded' | 'Unreachable' | 'Unknown'
 
@@ -118,6 +124,27 @@ export function fmtUptime(seconds: number): string {
   if (h > 0) return `${h}h ${m}m`
   if (m > 0) return `${m}m ${s % 60}s`
   return `${s}s`
+}
+
+/** Combine HealthService AdminClient status with the scrape-derived rollup
+ *  to produce the worst-case status for a cluster. HealthService only knows
+ *  "can we reach bootstrap?", so it happily reports HEALTHY while URP > 0 or
+ *  brokers are unreachable — the scraper is what catches that nuance. */
+export function effectiveClusterStatus(
+  cluster: ClusterHealthSummaryResponse,
+  scrape: MetricsScrapeResponse | undefined,
+): HealthStatus {
+  const group = scrape?.clusters.find((g) => g.clusterName === cluster.clusterName)
+  if (!group) return cluster.status
+  const rollup = rollupCluster(group)
+  // Severity order: DOWN (3) > DEGRADED (2) > HEALTHY (1) > UNKNOWN (0).
+  const rank: Record<HealthStatus, number> = { DOWN: 3, DEGRADED: 2, HEALTHY: 1, UNKNOWN: 0, NOT_APPLICABLE: 0 }
+  const scrapeEquivalent: HealthStatus =
+    rollup.overall === 'Unreachable' ? 'DOWN'
+      : rollup.overall === 'Degraded' ? 'DEGRADED'
+      : rollup.overall === 'Healthy' ? 'HEALTHY'
+      : 'UNKNOWN'
+  return rank[scrapeEquivalent] > rank[cluster.status] ? scrapeEquivalent : cluster.status
 }
 
 /** Color tokens for Healthy/Degraded/Unreachable/Unknown badges. */

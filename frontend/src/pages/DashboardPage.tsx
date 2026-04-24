@@ -11,6 +11,7 @@ import type {
   ServiceAccountTokenResponse,
 } from '../types/api'
 import { formatLabel } from '../utils/formatters'
+import { effectiveClusterStatus } from '../utils/brokerHealth'
 import type { DashboardContext } from '../layouts/AppLayout'
 
 type DashboardView = 'OVERVIEW' | Extract<HealthStatus, 'HEALTHY' | 'DEGRADED' | 'DOWN'>
@@ -25,6 +26,7 @@ export function DashboardPage() {
     error,
     setServiceAccounts,
     reloadClusters,
+    lastScrape,
   } = useOutletContext<DashboardContext>()
 
   const navigate = useNavigate()
@@ -34,16 +36,20 @@ export function DashboardPage() {
 
   const stats = useMemo(() => {
     const active = filter === 'ALL' ? clusters : filteredClusters
+    // Use the composite status (HealthService vs scrape rollup) so the
+    // Fleet tiles reflect broker-level degradation (URP, unreachable) that
+    // HealthService's AdminClient probe doesn't see.
+    const activeEffective = active.map((c) => ({ cluster: c, status: effectiveClusterStatus(c, lastScrape) }))
     return {
       totalClusters: active.length,
-      healthyClusters: active.filter((c) => c.status === 'HEALTHY').length,
-      degradedClusters: active.filter((c) => c.status === 'DEGRADED').length,
-      downClusters: active.filter((c) => c.status === 'DOWN').length,
+      healthyClusters: activeEffective.filter((e) => e.status === 'HEALTHY').length,
+      degradedClusters: activeEffective.filter((e) => e.status === 'DEGRADED').length,
+      downClusters: activeEffective.filter((e) => e.status === 'DOWN').length,
       healthyComponents: active.flatMap((c) => c.components).filter((c) => c.status === 'HEALTHY').length,
       degradedComponents: active.flatMap((c) => c.components).filter((c) => c.status === 'DEGRADED').length,
       downComponents: active.flatMap((c) => c.components).filter((c) => c.status === 'DOWN').length,
     }
-  }, [clusters, filter, filteredClusters])
+  }, [clusters, filter, filteredClusters, lastScrape])
 
   const statusPanelCount = useMemo(() => {
     if (dashboardView === 'OVERVIEW') return filteredClusters.length
@@ -188,6 +194,7 @@ export function DashboardPage() {
                 <ClusterList
                   clusters={filteredClusters}
                   selectedClusterId={selectedClusterId}
+                  scrape={lastScrape}
                   onSelect={handleSelectCluster}
                 />
               ) : (

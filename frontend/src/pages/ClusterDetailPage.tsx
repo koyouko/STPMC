@@ -81,6 +81,7 @@ export function ClusterDetailPage() {
         cluster={cluster}
         focusedComponentKind={focusedComponentKind}
         refreshing={refreshing}
+        scrape={lastScrape}
         onClearComponentFocus={() => setFocusedComponentKind(null)}
         onRefresh={handleRefresh}
       />
