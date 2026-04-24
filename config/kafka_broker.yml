@@ -25,15 +25,18 @@ blacklistObjectNames:
   - "kafka.*:type=kafka-metrics-count,*"
 
 rules:
-  # NOTE: The ClusterId rule is intentionally commented out below to simulate
-  # the user's production yml (which lacks it). This exercises the
-  # clusterName-fallback path in autoOnboardDiscoveredClusters.
-  # - pattern: 'kafka.server<type=KafkaServer, name=ClusterId><>Value: (.+)'
-  #   name: kafka_server_KafkaServer_ClusterId
-  #   value: 1
-  #   labels:
-  #     clusterId: "$1"
-  #   type: UNTYPED
+  # ── Kafka cluster ID (String attribute — needs explicit value/label mapping) ──
+  # Prometheus JMX Exporter drops String-valued JMX attributes by default.
+  # This rule captures the UUID into a label and emits a gauge of value 1
+  # so the scraper can surface it as a secondary identifier next to the
+  # CSV-provided clusterName. Drop this block to simulate the older
+  # production yml (the scraper still groups correctly by clusterName).
+  - pattern: 'kafka.server<type=KafkaServer, name=ClusterId><>Value: (.+)'
+    name: kafka_server_KafkaServer_ClusterId
+    value: 1
+    labels:
+      clusterId: "$1"
+    type: UNTYPED
 
   # ── Per-topic/partition metrics (Value attribute) ────────────────────────────
   - pattern: kafka.(\w+)<type=(.+), name=(.+), topic=(.+), partition=(.+)><>Value
