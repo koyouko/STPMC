@@ -84,10 +84,13 @@ start_server() {
     exit 0
   fi
 
-  # Auto-detect PostgreSQL profile from DB_URL
+  # Auto-detect persistent database profiles from DB_URL
   PROFILES="${SPRING_PROFILES_ACTIVE:-}"
   if [ -n "${DB_URL:-}" ] && echo "$DB_URL" | grep -qi "postgresql" && ! echo "$PROFILES" | grep -q "postgres"; then
     PROFILES="${PROFILES:+$PROFILES,}postgres"
+  fi
+  if [ -n "${DB_URL:-}" ] && echo "$DB_URL" | grep -qi "jdbc:oracle" && ! echo "$PROFILES" | grep -q "oracle"; then
+    PROFILES="${PROFILES:+$PROFILES,}oracle"
   fi
   PROFILE_ARG=""
   if [ -n "$PROFILES" ]; then
@@ -95,7 +98,9 @@ start_server() {
   fi
 
   # Display database type
-  if echo "${PROFILES:-}" | grep -q "postgres"; then
+  if echo "${PROFILES:-}" | grep -q "oracle"; then
+    DB_DISPLAY="Oracle (${DB_URL:-external datasource})"
+  elif echo "${PROFILES:-}" | grep -q "postgres"; then
     DB_DISPLAY="PostgreSQL (${DB_URL:-docker-compose defaults})"
   else
     DB_DISPLAY="H2 (in-memory)"
@@ -200,12 +205,14 @@ case "${1:-start}" in
     echo "  Environment variables:"
     echo "    MC_PORT=8080                        Server port"
     echo "    SPRING_PROFILES_ACTIVE=postgres     Use PostgreSQL instead of H2"
+    echo "    SPRING_PROFILES_ACTIVE=oracle       Use Oracle instead of H2"
     echo "    APP_SECURITY_MODE=saml              Auth mode (saml|development)"
     echo "    APP_SECRETS_BASE_DIR=/etc/secrets   Base dir for secret files"
     echo "    APP_ALLOWED_ORIGIN=http://host:port CORS allowed origin"
     echo "    APP_LOCAL_KAFKA_BOOTSTRAP=host:9092 Bootstrap servers"
     echo "    APP_SEED_DEMO_DATA=true             Seed demo data"
-    echo "    DB_URL=jdbc:postgresql://...        Database JDBC URL"
+    echo "    DB_URL=jdbc:postgresql://...        PostgreSQL JDBC URL"
+    echo "    DB_URL=jdbc:oracle:thin:@//...      Oracle JDBC URL"
     echo "    DB_USERNAME / DB_PASSWORD            Database credentials"
     exit 1
     ;;

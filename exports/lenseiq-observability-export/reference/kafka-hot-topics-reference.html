@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kafka Hot Topics Reference</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1117;
+      --surface: #171b22;
+      --surface-2: #20252e;
+      --line: #303745;
+      --text: #f3f5f9;
+      --muted: #9aa4b2;
+      --blue: #5f96ff;
+      --green: #73bf69;
+      --yellow: #f2cc0c;
+      --orange: #ff9830;
+      --red: #f2495c;
+      --cyan: #33b5d6;
+      --violet: #a970ff;
+      --shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    main {
+      width: min(1800px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 20px 0 36px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 52px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      background:
+        linear-gradient(135deg, #ff9830 0 45%, #f2495c 45% 100%);
+      display: grid;
+      place-items: center;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+      color: #111318;
+      font-weight: 900;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 650;
+      letter-spacing: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .chip {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      background: #12161d;
+      border-radius: 6px;
+      padding: 0 10px;
+      color: var(--text);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .chip span:first-child {
+      color: var(--blue);
+      font-weight: 650;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .panel {
+      min-width: 0;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: 7px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px 6px;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.25;
+      font-weight: 650;
+      color: #dce2ea;
+    }
+
+    .panel-note {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .panel-body {
+      padding: 10px 12px 14px;
+    }
+
+    .stat {
+      min-height: 160px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 78px;
+      line-height: 0.95;
+      font-weight: 760;
+      letter-spacing: 0;
+      overflow-wrap: anywhere;
+      text-align: center;
+    }
+
+    .stat.green { color: var(--green); }
+    .stat.blue { color: var(--blue); }
+    .stat.yellow { color: var(--yellow); }
+    .stat.red { color: var(--red); }
+
+    .topic-stat {
+      font-size: 28px;
+      line-height: 1.08;
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+
+    .span-3 { grid-column: span 3; }
+    .span-4 { grid-column: span 4; }
+    .span-5 { grid-column: span 5; }
+    .span-6 { grid-column: span 6; }
+    .span-7 { grid-column: span 7; }
+    .span-12 { grid-column: span 12; }
+
+    .bar-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr) minmax(160px, 3fr) minmax(72px, auto);
+      gap: 12px;
+      align-items: center;
+      min-height: 32px;
+    }
+
+    .topic-name {
+      min-width: 0;
+      color: #d9dee8;
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bar-track {
+      height: 22px;
+      background: var(--surface-2);
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    }
+
+    .bar {
+      height: 100%;
+      min-width: 2px;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--green), var(--yellow), var(--red));
+    }
+
+    .bar.cyan {
+      background: linear-gradient(90deg, var(--cyan), var(--blue));
+    }
+
+    .bar.violet {
+      background: linear-gradient(90deg, var(--violet), var(--blue));
+    }
+
+    .value {
+      color: #dce2ea;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .chart {
+      width: 100%;
+      height: 280px;
+      display: block;
+      background:
+        linear-gradient(var(--line) 1px, transparent 1px) 0 0 / 100% 25%,
+        linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 16.6% 100%;
+      border-left: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .legend {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: -1px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    td:nth-child(2),
+    td:nth-child(3) {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .delta {
+      color: var(--orange);
+      font-weight: 650;
+    }
+
+    .tenant-wrap {
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr);
+      gap: 18px;
+      align-items: center;
+    }
+
+    .donut {
+      width: min(170px, 100%);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at center, var(--surface) 0 47%, transparent 48%),
+        conic-gradient(var(--green) 0 47%, var(--orange) 47% 80%, var(--cyan) 80% 94%, var(--violet) 94% 100%);
+      border: 1px solid var(--line);
+      justify-self: center;
+    }
+
+    .tenant-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .tenant-row {
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      gap: 9px;
+      align-items: center;
+      color: #dce2ea;
+      font-size: 13px;
+    }
+
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      background: var(--green);
+    }
+
+    .swatch.orange { background: var(--orange); }
+    .swatch.cyan { background: var(--cyan); }
+    .swatch.violet { background: var(--violet); }
+
+    .callout {
+      border-left: 3px solid var(--blue);
+      background: rgba(95, 150, 255, 0.08);
+      color: #dce2ea;
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      color: #f8d676;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 1100px) {
+      .span-3,
+      .span-4,
+      .span-5,
+      .span-6,
+      .span-7 {
+        grid-column: span 12;
+      }
+
+      .stat {
+        min-height: 110px;
+        font-size: 52px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      main {
+        width: min(100% - 20px, 1800px);
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+        padding-bottom: 12px;
+      }
+
+      .bar-row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+
+      .value {
+        text-align: left;
+      }
+
+      .tenant-wrap {
+        grid-template-columns: 1fr;
+      }
+
+      .chart {
+        height: 220px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark">L</div>
+        <div>
+          <h1>Kafka Hot Topics</h1>
+          <div class="meta">Static HTML reference for the Grafana dashboard export</div>
+        </div>
+      </div>
+      <div class="meta">Last local sample: 2026-05-26</div>
+    </header>
+
+    <nav class="toolbar" aria-label="Dashboard variables">
+      <div class="chip"><span>Prometheus</span> prometheus</div>
+      <div class="chip"><span>Environment</span> PROD</div>
+      <div class="chip"><span>Tenant</span> All prefixes</div>
+      <div class="chip"><span>Cluster (job)</span> All</div>
+      <div class="chip"><span>Topic</span> All</div>
+      <div class="chip"><span>Top N</span> 5</div>
+      <div class="chip"><span>Hot threshold</span> 1 MiB/s</div>
+    </nav>
+
+    <section class="dashboard" aria-label="Kafka hot topics dashboard reference">
+      <article class="panel span-3">
+        <div class="panel-head">
+          <h2 class="panel-title">Hot topics (All)</h2>
+        </div>
+        <div class="stat green">29</div>
+      </article>
+
+      <article class="panel span-3">
+        <div class="panel-head">
+          <h2 class="panel-title">Total topics</h2>
+        </div>
+        <div class="stat blue">29</div>
+      </article>
+
+      <article class="panel span-3">
+        <div class="panel-head">
+          <h2 class="panel-title">Top topic</h2>
+        </div>
+        <div class="stat yellow topic-stat">channels.payment<br>events</div>
+      </article>
+
+      <article class="panel span-3">
+        <div class="panel-head">
+          <h2 class="panel-title">Top topic throughput</h2>
+        </div>
+        <div class="stat green">286 MiB/s</div>
+      </article>
+
+      <article class="panel span-6">
+        <div class="panel-head">
+          <h2 class="panel-title">Top 5 by bytes in + out (1m rate)</h2>
+          <span class="panel-note">MiB/s</span>
+        </div>
+        <div class="panel-body bar-list">
+          <div class="bar-row">
+            <div class="topic-name">channels.payment.events</div>
+            <div class="bar-track"><div class="bar" style="width:100%;"></div></div>
+            <div class="value">286</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">express.shipments.events</div>
+            <div class="bar-track"><div class="bar" style="width:78%;"></div></div>
+            <div class="value">223</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">express.tracking.updates</div>
+            <div class="bar-track"><div class="bar" style="width:61%;"></div></div>
+            <div class="value">173</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">channels.notify.outbound</div>
+            <div class="bar-track"><div class="bar" style="width:34%;"></div></div>
+            <div class="value">96</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">csf.ledger.txn</div>
+            <div class="bar-track"><div class="bar" style="width:30%;"></div></div>
+            <div class="value">87</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel span-6">
+        <div class="panel-head">
+          <h2 class="panel-title">Top 5 by messages in</h2>
+          <span class="panel-note">msg/s</span>
+        </div>
+        <div class="panel-body bar-list">
+          <div class="bar-row">
+            <div class="topic-name">express.tracking.updates</div>
+            <div class="bar-track"><div class="bar cyan" style="width:100%;"></div></div>
+            <div class="value">225.3k</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">express.shipments.events</div>
+            <div class="bar-track"><div class="bar cyan" style="width:90%;"></div></div>
+            <div class="value">201.6k</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">channels.payment.events</div>
+            <div class="bar-track"><div class="bar cyan" style="width:70%;"></div></div>
+            <div class="value">157.4k</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">channels.fx.quotes</div>
+            <div class="bar-track"><div class="bar cyan" style="width:53%;"></div></div>
+            <div class="value">119.4k</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">channels.session.audit</div>
+            <div class="bar-track"><div class="bar cyan" style="width:28%;"></div></div>
+            <div class="value">63.4k</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel span-6">
+        <div class="panel-head">
+          <h2 class="panel-title">Top 5 by log size on disk</h2>
+          <span class="panel-note">TiB</span>
+        </div>
+        <div class="panel-body bar-list">
+          <div class="bar-row">
+            <div class="topic-name">channels.payment.events</div>
+            <div class="bar-track"><div class="bar" style="width:100%;"></div></div>
+            <div class="value">2.87</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">channels.session.audit</div>
+            <div class="bar-track"><div class="bar" style="width:42%;"></div></div>
+            <div class="value">1.19</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">csf.ledger.txn</div>
+            <div class="bar-track"><div class="bar" style="width:39%;"></div></div>
+            <div class="value">1.10</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">express.shipments.events</div>
+            <div class="bar-track"><div class="bar" style="width:31%;"></div></div>
+            <div class="value">0.90</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">channels.notify.outbound</div>
+            <div class="bar-track"><div class="bar" style="width:31%;"></div></div>
+            <div class="value">0.88</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel span-6">
+        <div class="panel-head">
+          <h2 class="panel-title">Top 5 by request rate (produce + fetch)</h2>
+          <span class="panel-note">req/s</span>
+        </div>
+        <div class="panel-body bar-list">
+          <div class="bar-row">
+            <div class="topic-name">express.tracking.updates</div>
+            <div class="bar-track"><div class="bar violet" style="width:100%;"></div></div>
+            <div class="value">9.18k</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">express.shipments.events</div>
+            <div class="bar-track"><div class="bar violet" style="width:87%;"></div></div>
+            <div class="value">8.00k</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">channels.payment.events</div>
+            <div class="bar-track"><div class="bar violet" style="width:68%;"></div></div>
+            <div class="value">6.22k</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">channels.fx.quotes</div>
+            <div class="bar-track"><div class="bar violet" style="width:61%;"></div></div>
+            <div class="value">5.62k</div>
+          </div>
+          <div class="bar-row">
+            <div class="topic-name">csf.ledger.txn</div>
+            <div class="bar-track"><div class="bar violet" style="width:25%;"></div></div>
+            <div class="value">2.26k</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel span-7">
+        <div class="panel-head">
+          <h2 class="panel-title">Top 5 hot topics - bytes in + out trend</h2>
+          <span class="panel-note">30 day shape</span>
+        </div>
+        <div class="panel-body">
+          <svg class="chart" viewBox="0 0 900 280" role="img" aria-label="Static trend line chart">
+            <polyline fill="none" stroke="#73bf69" stroke-width="3" points="0,212 80,198 160,190 240,176 320,168 400,150 480,132 560,116 640,92 720,70 800,56 900,44"/>
+            <polyline fill="none" stroke="#ff9830" stroke-width="3" points="0,230 80,220 160,214 240,202 320,188 400,170 480,150 560,126 640,104 720,84 800,58 900,52"/>
+            <polyline fill="none" stroke="#33b5d6" stroke-width="3" points="0,245 80,236 160,220 240,210 320,192 400,176 480,158 560,140 640,118 720,104 800,88 900,76"/>
+            <polyline fill="none" stroke="#a970ff" stroke-width="3" points="0,252 80,238 160,226 240,214 320,206 400,190 480,182 560,170 640,158 720,144 800,130 900,122"/>
+          </svg>
+          <div class="legend">
+            <span><i class="dot" style="background:#73bf69;"></i>channels.payment.events</span>
+            <span><i class="dot" style="background:#ff9830;"></i>express.shipments.events</span>
+            <span><i class="dot" style="background:#33b5d6;"></i>express.tracking.updates</span>
+            <span><i class="dot" style="background:#a970ff;"></i>channels.notify.outbound</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel span-5">
+        <div class="panel-head">
+          <h2 class="panel-title">Trending up - 24h vs 7d average</h2>
+        </div>
+        <div class="panel-body">
+          <table>
+            <thead>
+              <tr>
+                <th>Topic</th>
+                <th>24h avg</th>
+                <th>Delta</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>express.shipments.events</td>
+                <td>179 MiB/s</td>
+                <td class="delta">+31%</td>
+              </tr>
+              <tr>
+                <td>express.tracking.updates</td>
+                <td>136 MiB/s</td>
+                <td class="delta">+24%</td>
+              </tr>
+              <tr>
+                <td>channels.fraud.signals</td>
+                <td>48 MiB/s</td>
+                <td class="delta">+16%</td>
+              </tr>
+              <tr>
+                <td>dda.txn.stream</td>
+                <td>28 MiB/s</td>
+                <td class="delta">+12%</td>
+              </tr>
+              <tr>
+                <td>csf.gl.feed</td>
+                <td>24 MiB/s</td>
+                <td class="delta">+8%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="panel span-6">
+        <div class="panel-head">
+          <h2 class="panel-title">Bytes-in share by tenant</h2>
+          <span class="panel-note">topic prefix</span>
+        </div>
+        <div class="panel-body tenant-wrap">
+          <div class="donut" aria-label="Tenant share donut chart"></div>
+          <div class="tenant-list">
+            <div class="tenant-row"><span class="swatch"></span><span>channels</span><strong>47%</strong></div>
+            <div class="tenant-row"><span class="swatch orange"></span><span>express</span><strong>33%</strong></div>
+            <div class="tenant-row"><span class="swatch cyan"></span><span>csf</span><strong>14%</strong></div>
+            <div class="tenant-row"><span class="swatch violet"></span><span>dda</span><strong>6%</strong></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel span-6">
+        <div class="panel-head">
+          <h2 class="panel-title">Tenant and cluster labels</h2>
+        </div>
+        <div class="panel-body">
+          <div class="callout">
+            Tenant is derived from the Kafka topic name with
+            <code>/^([^._]+)(?:[._].*)?$/</code>. Cluster still comes from the Prometheus
+            <code>job</code> label. Example:
+            <code>channels.payment.events</code> maps to tenant <code>channels</code>.
+          </div>
+        </div>
+      </article>
+
+      <article class="panel span-12">
+        <div class="panel-head">
+          <h2 class="panel-title">Drill-down: channels.payment.events - bytes in / bytes out / messages</h2>
+          <span class="panel-note">selected topic reference</span>
+        </div>
+        <div class="panel-body">
+          <svg class="chart" viewBox="0 0 1200 260" role="img" aria-label="Static drill-down chart">
+            <polyline fill="none" stroke="#73bf69" stroke-width="3" points="0,210 110,204 220,198 330,190 440,174 550,160 660,138 770,116 880,92 990,72 1100,58 1200,48"/>
+            <polyline fill="none" stroke="#33b5d6" stroke-width="3" points="0,230 110,224 220,216 330,206 440,194 550,178 660,160 770,144 880,126 990,112 1100,96 1200,88"/>
+            <polyline fill="none" stroke="#f2cc0c" stroke-width="3" points="0,242 110,238 220,234 330,226 440,218 550,208 660,196 770,186 880,176 990,168 1100,158 1200,150"/>
+          </svg>
+          <div class="legend">
+            <span><i class="dot" style="background:#73bf69;"></i>bytes in</span>
+            <span><i class="dot" style="background:#33b5d6;"></i>bytes out</span>
+            <span><i class="dot" style="background:#f2cc0c;"></i>messages</span>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

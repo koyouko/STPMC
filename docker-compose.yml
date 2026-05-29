@@ -63,12 +63,53 @@ services:
       - kafka-data:/var/lib/kafka/data
 
     healthcheck:
-      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      test: ["CMD-SHELL", "KAFKA_OPTS= kafka-topics --bootstrap-server localhost:9092 --list"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 45s
 
+  # ── Prometheus (scrapes Kafka JMX exporter) ──────────────────────
+  # UI: http://localhost:9090
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    restart: unless-stopped
+    container_name: lenseiq-prometheus
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  # ── Grafana (auto-provisions LenseIQ Kafka dashboards) ───────────
+  # UI: http://localhost:3000  default login: admin / admin
+  grafana:
+    image: grafana/grafana:10.4.0
+    restart: unless-stopped
+    container_name: lenseiq-grafana
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards/lenseiq:ro
+
 volumes:
   mission-control-postgres:
   kafka-data:
+  prometheus-data:
+  grafana-data:

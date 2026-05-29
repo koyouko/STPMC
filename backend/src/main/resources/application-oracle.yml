@@ -1,0 +1,25 @@
+# Oracle profile — activate with --spring.profiles.active=oracle
+# Override DB_URL, DB_USERNAME, and DB_PASSWORD for your Oracle service.
+# Example URL: jdbc:oracle:thin:@//db-host.example.com:1521/FREEPDB1
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:oracle:thin:@//localhost:1521/FREEPDB1}
+    username: ${DB_USERNAME:mission_control}
+    password: ${DB_PASSWORD:mission_control}
+    driver-class-name: oracle.jdbc.OracleDriver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: ${DB_MIN_IDLE:2}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:20000}
+      idle-timeout: ${DB_IDLE_TIMEOUT_MS:300000}
+  h2:
+    console:
+      enabled: false
+  jpa:
+    database-platform: org.hibernate.dialect.OracleDialect
+    hibernate:
+      ddl-auto: ${HIBERNATE_DDL_AUTO:validate}
+    properties:
+      hibernate:
+        format_sql: true

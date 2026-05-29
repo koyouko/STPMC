@@ -1,0 +1,1092 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "LenseIQ Hot Topics \u2014 top-N hottest Kafka topics per cluster/tenant with up-to-30-day trending. Built for Confluent JMX exporter (lowercase metric names). Drill in via the $topic variable.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Hot topics ($cluster)",
+      "description": "Count of topics whose 1-min bytes-in+out rate exceeds the $min_bytes_per_sec threshold.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count( ( sum by (topic) ( {__name__=~\"kafka_server_brokertopicmetrics_bytes(in|out)persec_oneminuterate\", job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"} ) ) > $min_bytes_per_sec ) or vector(0)",
+          "instant": true,
+          "legendFormat": "hot"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 20
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Total topics",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count( count by (topic) ( kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"} ) )",
+          "instant": true,
+          "legendFormat": "topics"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "mappings": [],
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Top topic",
+      "description": "Topic with the highest bytes-in+out 1-min rate right now.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(1, sum by (topic) ( {__name__=~\"kafka_server_brokertopicmetrics_bytes(in|out)persec_oneminuterate\", job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"} ) )",
+          "instant": true,
+          "legendFormat": "{{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          },
+          "mappings": [],
+          "unit": "Bps"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "name"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Top topic throughput",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max( topk(1, sum by (topic) ( {__name__=~\"kafka_server_brokertopicmetrics_bytes(in|out)persec_oneminuterate\", job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"} ) ) )",
+          "instant": true,
+          "legendFormat": "bytes/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 10485760
+              },
+              {
+                "color": "red",
+                "value": 104857600
+              }
+            ]
+          },
+          "unit": "Bps"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "bargauge",
+      "title": "Top $top_n by bytes in + out (1m rate)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk($top_n, sum by (topic) ( {__name__=~\"kafka_server_brokertopicmetrics_bytes(in|out)persec_oneminuterate\", job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"} ) )",
+          "instant": true,
+          "legendFormat": "{{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-YlOrRd"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "Bps"
+        }
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      }
+    },
+    {
+      "id": 6,
+      "type": "bargauge",
+      "title": "Top $top_n by messages in",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk($top_n, sum by (topic) ( kafka_server_brokertopicmetrics_messagesinpersec_oneminuterate{job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"} ) )",
+          "instant": true,
+          "legendFormat": "{{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "mappings": [],
+          "unit": "mps"
+        }
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true
+      }
+    },
+    {
+      "id": 7,
+      "type": "bargauge",
+      "title": "Top $top_n by log size on disk",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk($top_n, sum by (topic) ( kafka_log_log_size{job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"} ) )",
+          "instant": true,
+          "legendFormat": "{{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "mappings": [],
+          "unit": "bytes"
+        }
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true
+      }
+    },
+    {
+      "id": 8,
+      "type": "bargauge",
+      "title": "Top $top_n by request rate (produce + fetch)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 15,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk($top_n, sum by (topic) ( {__name__=~\"kafka_server_brokertopicmetrics_total(produce|fetch)requestspersec_oneminuterate\", job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"} ) )",
+          "instant": true,
+          "legendFormat": "{{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-RdYlGr"
+          },
+          "mappings": [],
+          "unit": "reqps"
+        }
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Top 5 hot topics \u2014 bytes in + out trend ($__range)",
+      "description": "Multi-line trend of the 5 currently-hottest topics, over the dashboard time range. Pick 30d in the time picker to see the full retention window.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(5, sum by (topic) ( {__name__=~\"kafka_server_brokertopicmetrics_bytes(in|out)persec_oneminuterate\", job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"} ) )",
+          "legendFormat": "{{topic}}",
+          "interval": "$__rate_interval"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "Bps"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Trending up \u2014 24h vs 7d average",
+      "description": "Topics whose last 24h average is materially higher than their 7d baseline. (24h_avg / 7d_avg) \u2212 1 > 0 means trending up.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 14,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "AVG24",
+          "expr": "topk(15, ( sum by (topic) ( avg_over_time(kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"}[24h]) ) + sum by (topic) ( avg_over_time(kafka_server_brokertopicmetrics_bytesoutpersec_oneminuterate{job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"}[24h]) ) ) )",
+          "instant": true,
+          "format": "table",
+          "legendFormat": ""
+        },
+        {
+          "refId": "AVG7D",
+          "expr": "sum by (topic) ( avg_over_time(kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"}[7d]) ) + sum by (topic) ( avg_over_time(kafka_server_brokertopicmetrics_bytesoutpersec_oneminuterate{job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"}[7d]) )",
+          "instant": true,
+          "format": "table",
+          "legendFormat": ""
+        },
+        {
+          "refId": "DELTA",
+          "expr": "( ( sum by (topic) ( avg_over_time(kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"}[24h]) ) + sum by (topic) ( avg_over_time(kafka_server_brokertopicmetrics_bytesoutpersec_oneminuterate{job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"}[24h]) ) ) / ( sum by (topic) ( avg_over_time(kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"}[7d]) ) + sum by (topic) ( avg_over_time(kafka_server_brokertopicmetrics_bytesoutpersec_oneminuterate{job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"}[7d]) ) ) ) - 1",
+          "instant": true,
+          "format": "table",
+          "legendFormat": ""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "topic",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true
+            },
+            "renameByName": {
+              "topic": "Topic",
+              "Value #AVG24": "24h avg",
+              "Value #AVG7D": "7d avg",
+              "Value #DELTA": "\u0394 (24h vs 7d)"
+            },
+            "indexByName": {
+              "Topic": 0,
+              "24h avg": 1,
+              "7d avg": 2,
+              "\u0394 (24h vs 7d)": 3
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "\u0394 (24h vs 7d)",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "24h avg"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "Bps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "7d avg"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "Bps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "\u0394 (24h vs 7d)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "blue",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": -0.1
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.1
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.3
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "piechart",
+      "title": "Bytes-in share by tenant",
+      "description": "How total bytes-in are split across tenants on the selected cluster. Tenant = topic prefix before the first dot or underscore.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 14,
+        "y": 35,
+        "w": 10,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (tenant) ( label_replace( kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"}, \"tenant\", \"$1\", \"topic\", \"^([^._]+)(?:[._].*)?$\" ) )",
+          "instant": true,
+          "legendFormat": "{{tenant}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "unit": "Bps"
+        }
+      },
+      "options": {
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Drill-down: $topic \u2014 bytes in / bytes out / messages",
+      "description": "Pick a topic in the $topic variable to see its full per-metric trend (up to 30 days).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "BIN",
+          "expr": "sum( kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{job=~\"$cluster\", topic=~\"(${tenant:pipe})([._].*)?\", topic=~\"$topic\"} )",
+          "legendFormat": "bytes in",
+          "interval": "$__rate_interval"
+        },
+        {
+          "refId": "BOUT",
+          "expr": "sum( kafka_server_brokertopicmetrics_bytesoutpersec_oneminuterate{job=~\"$cluster\", topic=~\"(${tenant:pipe})([._].*)?\", topic=~\"$topic\"} )",
+          "legendFormat": "bytes out",
+          "interval": "$__rate_interval"
+        },
+        {
+          "refId": "MIN",
+          "expr": "sum( kafka_server_brokertopicmetrics_messagesinpersec_oneminuterate{job=~\"$cluster\", topic=~\"(${tenant:pipe})([._].*)?\", topic=~\"$topic\"} )",
+          "legendFormat": "messages in",
+          "interval": "$__rate_interval"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "bytes in"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "Bps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "bytes out"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "Bps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "messages in"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "mps"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "kafka",
+    "lenseiq",
+    "hot-topics",
+    "confluent"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "label": "Prometheus",
+        "type": "datasource",
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "current": {
+          "selected": true,
+          "text": "Prometheus",
+          "value": "PROMETHEUS_LOCAL"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "options": [],
+        "skipUrlSync": false
+      },
+      {
+        "name": "env",
+        "label": "Environment",
+        "type": "custom",
+        "datasource": null,
+        "query": "PROD,UAT,DEV",
+        "current": {
+          "selected": true,
+          "text": "PROD",
+          "value": "PROD"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "options": [
+          {
+            "selected": true,
+            "text": "PROD",
+            "value": "PROD"
+          },
+          {
+            "selected": false,
+            "text": "UAT",
+            "value": "UAT"
+          },
+          {
+            "selected": false,
+            "text": "DEV",
+            "value": "DEV"
+          }
+        ],
+        "skipUrlSync": false
+      },
+      {
+        "name": "tenant",
+        "label": "Tenant",
+        "description": "Derived from the topic prefix before the first dot or underscore (e.g. channels, csf, dda, express).",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PROMETHEUS_LOCAL"
+        },
+        "definition": "label_values(kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{env=~\"$env\", topic!=\"\"}, topic)",
+        "query": {
+          "query": "label_values(kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{env=~\"$env\", topic!=\"\"}, topic)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "regex": "/^([^._]+)(?:[._].*)?$/",
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "options": [],
+        "skipUrlSync": false
+      },
+      {
+        "name": "cluster",
+        "label": "Cluster (job)",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PROMETHEUS_LOCAL"
+        },
+        "definition": "label_values(kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{env=~\"$env\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"}, job)",
+        "query": {
+          "query": "label_values(kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{env=~\"$env\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"}, job)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "options": [],
+        "skipUrlSync": false
+      },
+      {
+        "name": "topic",
+        "label": "Topic (drill-down)",
+        "description": "Used by the bottom drill-down panel. Leave on All for the top-N panels.",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PROMETHEUS_LOCAL"
+        },
+        "definition": "label_values(kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{env=~\"$env\", job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"}, topic)",
+        "query": {
+          "query": "label_values(kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{env=~\"$env\", job=~\"$cluster\", topic!=\"\", topic=~\"(${tenant:pipe})([._].*)?\"}, topic)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "options": [],
+        "skipUrlSync": false
+      },
+      {
+        "name": "top_n",
+        "label": "Top N",
+        "type": "custom",
+        "query": "5,10,20,50",
+        "current": {
+          "selected": true,
+          "text": "5",
+          "value": "5"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "options": [
+          {
+            "selected": true,
+            "text": "5",
+            "value": "5"
+          },
+          {
+            "selected": false,
+            "text": "10",
+            "value": "10"
+          },
+          {
+            "selected": false,
+            "text": "20",
+            "value": "20"
+          },
+          {
+            "selected": false,
+            "text": "50",
+            "value": "50"
+          }
+        ],
+        "skipUrlSync": false
+      },
+      {
+        "name": "min_bytes_per_sec",
+        "label": "Hot threshold (B/s)",
+        "description": "Topics with bytes-in+out 1m rate below this are not counted as 'hot' in the headline stat.",
+        "type": "textbox",
+        "query": "1048576",
+        "current": {
+          "selected": true,
+          "text": "1048576",
+          "value": "1048576"
+        },
+        "hide": 0,
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "time_options": [
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "14d",
+      "30d"
+    ]
+  },
+  "timezone": "browser",
+  "title": "LenseIQ \u2014 Kafka Hot Topics",
+  "uid": "lenseiq-hot-topics",
+  "version": 1,
+  "weekStart": ""
+}

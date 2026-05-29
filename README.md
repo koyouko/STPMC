@@ -93,6 +93,27 @@ HIBERNATE_DDL_AUTO=validate \
 
 The `postgres` profile auto-activates when `DB_URL` contains "postgresql". See `application-postgres.yml` for all configurable settings.
 
+### Oracle (persistent data)
+
+Activate the `oracle` Spring profile to connect the backend to Oracle:
+
+```bash
+DB_URL=jdbc:oracle:thin:@//your-host:1521/YOUR_SERVICE \
+DB_USERNAME=your_user \
+DB_PASSWORD=your_password \
+SPRING_PROFILES_ACTIVE=oracle \
+HIBERNATE_DDL_AUTO=validate \
+./deploy/start.sh start
+```
+
+The Linux launcher also auto-activates the `oracle` profile when `DB_URL` starts with `jdbc:oracle`. See `application-oracle.yml` for all configurable settings. For production Oracle schemas, keep `HIBERNATE_DDL_AUTO=validate` and apply reviewed DDL migrations outside application startup.
+
+For a fresh Oracle schema, apply the included DDL first:
+
+```bash
+sqlplus your_user/your_password@//your-host:1521/YOUR_SERVICE @deploy/oracle-schema.sql
+```
+
 ### Windows backend commands
 
 Use the Maven wrapper on Windows like this:
@@ -208,9 +229,11 @@ Set `HIBERNATE_DDL_AUTO=validate` (default). Run this migration for JMX auto-onb
 ALTER TABLE clusters ADD COLUMN jmx_cluster_id VARCHAR(255);
 ```
 
+For Oracle, use `deploy/oracle-schema.sql` for a fresh schema or translate the migration above to your existing Oracle schema with `VARCHAR2(255 CHAR)`.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DB_URL` | H2 in-memory | JDBC URL (PostgreSQL recommended for prod) |
+| `DB_URL` | H2 in-memory | JDBC URL (PostgreSQL or Oracle for prod) |
 | `DB_USERNAME` / `DB_PASSWORD` | sa / (empty) | Database credentials |
 | `APP_SECURITY_MODE` | saml | `saml` or `development` |
 | `APP_ALLOWED_ORIGIN` | http://localhost:5173 | CORS allowed origin |
@@ -227,6 +250,6 @@ ALTER TABLE clusters ADD COLUMN jmx_cluster_id VARCHAR(255);
 ## Verification
 
 ```bash
-cd backend && ./mvnw test        # 20 tests: security, API, service layer
+cd backend && ./mvnw test        # 25 tests: security, API, service layer, Oracle wiring
 cd frontend && npm run build     # TypeScript compile + Vite production build
 ```

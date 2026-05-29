@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Executive Overview Reference</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1117;
+      --surface: #171b22;
+      --surface-2: #20252e;
+      --line: #303745;
+      --text: #f3f5f9;
+      --muted: #9aa4b2;
+      --blue: #5f96ff;
+      --green: #73bf69;
+      --yellow: #f2cc0c;
+      --orange: #ff9830;
+      --red: #f2495c;
+      --cyan: #33b5d6;
+      --shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    main {
+      width: min(1800px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 20px 0 36px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 52px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #ff9830 0 45%, #f2495c 45% 100%);
+      display: grid;
+      place-items: center;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+      color: #111318;
+      font-weight: 900;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 650;
+      letter-spacing: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .chip {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      background: #12161d;
+      border-radius: 6px;
+      padding: 0 10px;
+      color: var(--text);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .chip span:first-child {
+      color: var(--blue);
+      font-weight: 650;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .panel {
+      min-width: 0;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: 7px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px 6px;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.25;
+      font-weight: 650;
+      color: #dce2ea;
+    }
+
+    .panel-note {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .panel-body {
+      padding: 10px 12px 14px;
+    }
+
+    .span-3 { grid-column: span 3; }
+    .span-4 { grid-column: span 4; }
+    .span-5 { grid-column: span 5; }
+    .span-7 { grid-column: span 7; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+
+    .stat {
+      min-height: 146px;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 8px;
+      padding: 8px 12px 22px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 78px;
+      line-height: 0.95;
+      font-weight: 760;
+      letter-spacing: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-sub {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .green { color: var(--green); }
+    .blue { color: var(--blue); }
+    .orange { color: var(--orange); }
+    .red { color: var(--red); }
+    .yellow { color: var(--yellow); }
+
+    .spark {
+      width: min(180px, 100%);
+      height: 30px;
+      display: block;
+      opacity: 0.9;
+    }
+
+    .chart {
+      width: 100%;
+      height: 300px;
+      display: block;
+      background:
+        linear-gradient(var(--line) 1px, transparent 1px) 0 0 / 100% 25%,
+        linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 14.28% 100%;
+      border-left: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .legend {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: -1px;
+    }
+
+    .health-wrap {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      gap: 18px;
+      align-items: center;
+    }
+
+    .donut {
+      width: min(166px, 100%);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at center, var(--surface) 0 47%, transparent 48%),
+        conic-gradient(var(--green) 0 83.3%, var(--orange) 83.3% 91.6%, var(--red) 91.6% 100%);
+      border: 1px solid var(--line);
+      justify-self: center;
+    }
+
+    .health-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .health-row {
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      gap: 9px;
+      align-items: center;
+      color: #dce2ea;
+      font-size: 13px;
+    }
+
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      background: var(--green);
+    }
+
+    .swatch.orange { background: var(--orange); }
+    .swatch.red { background: var(--red); }
+
+    .bar-list {
+      display: grid;
+      gap: 11px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: minmax(210px, 1fr) minmax(160px, 2.6fr) minmax(80px, auto);
+      gap: 12px;
+      align-items: center;
+      min-height: 28px;
+    }
+
+    .job-name {
+      min-width: 0;
+      color: #d9dee8;
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bar-track {
+      height: 20px;
+      background: var(--surface-2);
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    }
+
+    .bar {
+      height: 100%;
+      min-width: 2px;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--cyan), var(--blue));
+    }
+
+    .value {
+      color: #dce2ea;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    td:nth-child(n+3),
+    th:nth-child(n+3) {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 72px;
+      min-height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #101318;
+      background: var(--green);
+    }
+
+    .badge.degraded { background: var(--orange); }
+    .badge.down { background: var(--red); color: #fff; }
+
+    .callout {
+      border-left: 3px solid var(--blue);
+      background: rgba(95, 150, 255, 0.08);
+      color: #dce2ea;
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      color: #f8d676;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 1100px) {
+      .span-3,
+      .span-4,
+      .span-5,
+      .span-7,
+      .span-8 {
+        grid-column: span 12;
+      }
+
+      .stat {
+        min-height: 112px;
+      }
+
+      .stat-value {
+        font-size: 54px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      main {
+        width: min(100% - 20px, 1800px);
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+        padding-bottom: 12px;
+      }
+
+      .health-wrap,
+      .bar-row {
+        grid-template-columns: 1fr;
+      }
+
+      .value {
+        text-align: left;
+      }
+
+      .chart {
+        height: 230px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark">L</div>
+        <div>
+          <h1>Executive Overview</h1>
+          <div class="meta">Static HTML reference for the Grafana dashboard export</div>
+        </div>
+      </div>
+      <div class="meta">Last local sample: 2026-05-26</div>
+    </header>
+
+    <nav class="toolbar" aria-label="Dashboard variables">
+      <div class="chip"><span>Prometheus</span> prometheus</div>
+      <div class="chip"><span>Environment</span> PROD</div>
+      <div class="chip"><span>Range</span> Last 7 days</div>
+      <div class="chip"><span>Refresh</span> 1m</div>
+    </nav>
+
+    <section class="dashboard" aria-label="Kafka executive overview dashboard reference">
+      <article class="panel span-3">
+        <div class="panel-head">
+          <h2 class="panel-title">Total clusters</h2>
+        </div>
+        <div class="stat">
+          <div class="stat-value blue">12</div>
+          <svg class="spark" viewBox="0 0 180 30" aria-hidden="true">
+            <polyline fill="none" stroke="#5f96ff" stroke-width="3" points="0,18 25,18 50,18 75,18 100,18 125,18 150,18 180,18"/>
+          </svg>
+          <div class="stat-sub">all PROD Kafka jobs</div>
+        </div>
+      </article>
+
+      <article class="panel span-3">
+        <div class="panel-head">
+          <h2 class="panel-title">Healthy</h2>
+        </div>
+        <div class="stat">
+          <div class="stat-value green">10</div>
+          <svg class="spark" viewBox="0 0 180 30" aria-hidden="true">
+            <polyline fill="none" stroke="#73bf69" stroke-width="3" points="0,16 25,15 50,15 75,17 100,16 125,14 150,15 180,13"/>
+          </svg>
+          <div class="stat-sub">no offline or under-replicated partitions</div>
+        </div>
+      </article>
+
+      <article class="panel span-3">
+        <div class="panel-head">
+          <h2 class="panel-title">Degraded</h2>
+        </div>
+        <div class="stat">
+          <div class="stat-value orange">1</div>
+          <svg class="spark" viewBox="0 0 180 30" aria-hidden="true">
+            <polyline fill="none" stroke="#ff9830" stroke-width="3" points="0,22 25,22 50,12 75,12 100,14 125,18 150,16 180,16"/>
+          </svg>
+          <div class="stat-sub">under-replicated, still online</div>
+        </div>
+      </article>
+
+      <article class="panel span-3">
+        <div class="panel-head">
+          <h2 class="panel-title">Down</h2>
+        </div>
+        <div class="stat">
+          <div class="stat-value red">1</div>
+          <svg class="spark" viewBox="0 0 180 30" aria-hidden="true">
+            <polyline fill="none" stroke="#f2495c" stroke-width="3" points="0,24 25,24 50,24 75,24 100,8 125,8 150,8 180,8"/>
+          </svg>
+          <div class="stat-sub">offline partitions or no controller</div>
+        </div>
+      </article>
+
+      <article class="panel span-8">
+        <div class="panel-head">
+          <h2 class="panel-title">Estate health history (7d)</h2>
+          <span class="panel-note">cluster count</span>
+        </div>
+        <div class="panel-body">
+          <svg class="chart" viewBox="0 0 1000 300" role="img" aria-label="Static estate health history">
+            <polyline fill="none" stroke="#73bf69" stroke-width="4" points="0,70 120,70 240,70 360,72 480,74 600,70 720,68 840,66 1000,64"/>
+            <polyline fill="none" stroke="#ff9830" stroke-width="4" points="0,255 120,255 240,150 360,148 480,152 600,206 720,210 840,210 1000,210"/>
+            <polyline fill="none" stroke="#f2495c" stroke-width="4" points="0,270 120,270 240,270 360,270 480,90 600,90 720,90 840,90 1000,90"/>
+          </svg>
+          <div class="legend">
+            <span><i class="dot" style="background:#73bf69;"></i>healthy</span>
+            <span><i class="dot" style="background:#ff9830;"></i>degraded</span>
+            <span><i class="dot" style="background:#f2495c;"></i>down</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel span-4">
+        <div class="panel-head">
+          <h2 class="panel-title">Current estate mix</h2>
+          <span class="panel-note">12 clusters</span>
+        </div>
+        <div class="panel-body health-wrap">
+          <div class="donut" aria-label="Health status donut chart"></div>
+          <div class="health-list">
+            <div class="health-row"><span class="swatch"></span><span>Healthy</span><strong>10</strong></div>
+            <div class="health-row"><span class="swatch orange"></span><span>Degraded</span><strong>1</strong></div>
+            <div class="health-row"><span class="swatch red"></span><span>Down</span><strong>1</strong></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel span-5">
+        <div class="panel-head">
+          <h2 class="panel-title">Top clusters by bytes in</h2>
+          <span class="panel-note">MiB/s</span>
+        </div>
+        <div class="panel-body bar-list">
+          <div class="bar-row">
+            <div class="job-name">CHANNELS_NAM_PROD_COB_PHY</div>
+            <div class="bar-track"><div class="bar" style="width:100%;"></div></div>
+            <div class="value">153.4</div>
+          </div>
+          <div class="bar-row">
+            <div class="job-name">CHANNELS_IDL_PROD_COB_PHY</div>
+            <div class="bar-track"><div class="bar" style="width:53%;"></div></div>
+            <div class="value">80.7</div>
+          </div>
+          <div class="bar-row">
+            <div class="job-name">CHANNELS_EMEA_PROD_COB_PHY</div>
+            <div class="bar-track"><div class="bar" style="width:47%;"></div></div>
+            <div class="value">71.6</div>
+          </div>
+          <div class="bar-row">
+            <div class="job-name">CSF_NAM_PROD_COB</div>
+            <div class="bar-track"><div class="bar" style="width:43%;"></div></div>
+            <div class="value">65.3</div>
+          </div>
+          <div class="bar-row">
+            <div class="job-name">EXPRESS_APAC_PROD_COB_PHY</div>
+            <div class="bar-track"><div class="bar" style="width:41%;"></div></div>
+            <div class="value">62.8</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel span-7">
+        <div class="panel-head">
+          <h2 class="panel-title">Status rule reference</h2>
+        </div>
+        <div class="panel-body">
+          <div class="callout">
+            Cluster identity comes from the Prometheus <code>job</code> label.
+            A cluster is <code>Down</code> when offline partitions are greater than zero
+            or active controller count is not one. It is <code>Degraded</code> when
+            under-replicated partitions are greater than zero and the cluster is still online.
+          </div>
+        </div>
+      </article>
+
+      <article class="panel span-12">
+        <div class="panel-head">
+          <h2 class="panel-title">Cluster status - current</h2>
+          <span class="panel-note">sorted by risk, then throughput</span>
+        </div>
+        <div class="panel-body">
+          <table>
+            <thead>
+              <tr>
+                <th>Cluster (job)</th>
+                <th>Status</th>
+                <th>URP</th>
+                <th>Offline</th>
+                <th>Active</th>
+                <th>Bytes in</th>
+                <th>Bytes out</th>
+                <th>Topics</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>EXPRESS_EMEA_PROD_COB_PHY</td>
+                <td><span class="badge down">Down</span></td>
+                <td>0</td>
+                <td>12</td>
+                <td>1</td>
+                <td>53.9 MiB/s</td>
+                <td>60.2 MiB/s</td>
+                <td>7</td>
+              </tr>
+              <tr>
+                <td>CHANNELS_NAM_PROD_COB_Prober</td>
+                <td><span class="badge degraded">Degraded</span></td>
+                <td>24</td>
+                <td>0</td>
+                <td>1</td>
+                <td>20.9 MiB/s</td>
+                <td>23.9 MiB/s</td>
+                <td>9</td>
+              </tr>
+              <tr>
+                <td>CHANNELS_NAM_PROD_COB_PHY</td>
+                <td><span class="badge">Healthy</span></td>
+                <td>0</td>
+                <td>0</td>
+                <td>1</td>
+                <td>153.4 MiB/s</td>
+                <td>168.3 MiB/s</td>
+                <td>9</td>
+              </tr>
+              <tr>
+                <td>CHANNELS_IDL_PROD_COB_PHY</td>
+                <td><span class="badge">Healthy</span></td>
+                <td>0</td>
+                <td>0</td>
+                <td>1</td>
+                <td>80.7 MiB/s</td>
+                <td>91.6 MiB/s</td>
+                <td>9</td>
+              </tr>
+              <tr>
+                <td>CHANNELS_EMEA_PROD_COB_PHY</td>
+                <td><span class="badge">Healthy</span></td>
+                <td>0</td>
+                <td>0</td>
+                <td>1</td>
+                <td>71.6 MiB/s</td>
+                <td>81.6 MiB/s</td>
+                <td>9</td>
+              </tr>
+              <tr>
+                <td>CSF_NAM_PROD_COB</td>
+                <td><span class="badge">Healthy</span></td>
+                <td>0</td>
+                <td>0</td>
+                <td>1</td>
+                <td>65.3 MiB/s</td>
+                <td>72.1 MiB/s</td>
+                <td>7</td>
+              </tr>
+              <tr>
+                <td>EXPRESS_APAC_PROD_COB_PHY</td>
+                <td><span class="badge">Healthy</span></td>
+                <td>0</td>
+                <td>0</td>
+                <td>1</td>
+                <td>62.8 MiB/s</td>
+                <td>75.3 MiB/s</td>
+                <td>7</td>
+              </tr>
+              <tr>
+                <td>EXPRESS_NAM_PROD_COB_PHY</td>
+                <td><span class="badge">Healthy</span></td>
+                <td>0</td>
+                <td>0</td>
+                <td>1</td>
+                <td>58.2 MiB/s</td>
+                <td>72.8 MiB/s</td>
+                <td>7</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

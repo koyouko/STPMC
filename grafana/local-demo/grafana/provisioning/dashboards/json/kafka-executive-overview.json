@@ -1,0 +1,712 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "LenseIQ Executive Overview \u2014 estate-wide cluster health rollup. Stat row at the top with 7-day sparklines, supported by a worst-clusters table and an estate health history chart.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total clusters",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count( count by (job) (kafka_controller_kafkacontroller_activecontrollercount{env=~\"$env\"}) )",
+          "legendFormat": "clusters",
+          "interval": "1h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "mappings": [],
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Healthy",
+      "description": "Clusters with offline_partitions = 0 AND under_replicated = 0 AND active_controllers = 1.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count( ( max by (job) (kafka_controller_kafkacontroller_offlinepartitionscount{env=~\"$env\"}) == 0 ) and ( max by (job) (kafka_server_replicamanager_underreplicatedpartitions{env=~\"$env\"}) == 0 ) and ( max by (job) (kafka_controller_kafkacontroller_activecontrollercount{env=~\"$env\"}) == 1 ) )",
+          "legendFormat": "healthy",
+          "interval": "1h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          },
+          "mappings": [],
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Degraded",
+      "description": "Clusters with under-replicated partitions > 0 but no offline partitions.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count( ( max by (job) (kafka_server_replicamanager_underreplicatedpartitions{env=~\"$env\"}) > 0 ) and ( max by (job) (kafka_controller_kafkacontroller_offlinepartitionscount{env=~\"$env\"}) == 0 ) )",
+          "legendFormat": "degraded",
+          "interval": "1h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          },
+          "mappings": [],
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Down",
+      "description": "Clusters with offline partitions > 0 OR no active controller.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count( ( max by (job) (kafka_controller_kafkacontroller_offlinepartitionscount{env=~\"$env\"}) > 0 ) or ( max by (job) (kafka_controller_kafkacontroller_activecontrollercount{env=~\"$env\"}) != 1 ) )",
+          "legendFormat": "down",
+          "interval": "1h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          },
+          "mappings": [],
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Estate health history (7d)",
+      "description": "Stacked count of clusters by status over time. Watch the green bar narrow when something goes wrong.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "HEALTHY",
+          "expr": "count( ( max by (job) (kafka_controller_kafkacontroller_offlinepartitionscount{env=~\"$env\"}) == 0 ) and ( max by (job) (kafka_server_replicamanager_underreplicatedpartitions{env=~\"$env\"}) == 0 ) and ( max by (job) (kafka_controller_kafkacontroller_activecontrollercount{env=~\"$env\"}) == 1 ) )",
+          "legendFormat": "healthy",
+          "interval": "5m"
+        },
+        {
+          "refId": "DEGRADED",
+          "expr": "count( ( max by (job) (kafka_server_replicamanager_underreplicatedpartitions{env=~\"$env\"}) > 0 ) and ( max by (job) (kafka_controller_kafkacontroller_offlinepartitionscount{env=~\"$env\"}) == 0 ) )",
+          "legendFormat": "degraded",
+          "interval": "5m"
+        },
+        {
+          "refId": "DOWN",
+          "expr": "count( ( max by (job) (kafka_controller_kafkacontroller_offlinepartitionscount{env=~\"$env\"}) > 0 ) or ( max by (job) (kafka_controller_kafkacontroller_activecontrollercount{env=~\"$env\"}) != 1 ) )",
+          "legendFormat": "down",
+          "interval": "5m"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 0,
+            "fillOpacity": 90,
+            "stacking": {
+              "mode": "normal"
+            },
+            "showPoints": "never",
+            "barAlignment": 0,
+            "spanNulls": false
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "healthy"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "degraded"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "down"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Cluster status \u2014 current",
+      "description": "One row per cluster with current health signals. Sort columns to find what's hurting.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS_LOCAL"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "refId": "URP",
+          "expr": "max by (job) (kafka_server_replicamanager_underreplicatedpartitions{env=~\"$env\"})",
+          "instant": true,
+          "format": "table",
+          "legendFormat": ""
+        },
+        {
+          "refId": "OFF",
+          "expr": "max by (job) (kafka_controller_kafkacontroller_offlinepartitionscount{env=~\"$env\"})",
+          "instant": true,
+          "format": "table",
+          "legendFormat": ""
+        },
+        {
+          "refId": "CTRL",
+          "expr": "sum by (job) (kafka_controller_kafkacontroller_activecontrollercount{env=~\"$env\"})",
+          "instant": true,
+          "format": "table",
+          "legendFormat": ""
+        },
+        {
+          "refId": "BIN",
+          "expr": "sum by (job) (kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{env=~\"$env\"})",
+          "instant": true,
+          "format": "table",
+          "legendFormat": ""
+        },
+        {
+          "refId": "BOUT",
+          "expr": "sum by (job) (kafka_server_brokertopicmetrics_bytesoutpersec_oneminuterate{env=~\"$env\"})",
+          "instant": true,
+          "format": "table",
+          "legendFormat": ""
+        },
+        {
+          "refId": "TOPICS",
+          "expr": "count by (job) ( count by (job, topic) ( kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate{env=~\"$env\", topic!=\"\"} ) )",
+          "instant": true,
+          "format": "table",
+          "legendFormat": ""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "job",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "Time 5": true,
+              "Time 6": true
+            },
+            "renameByName": {
+              "job": "Cluster",
+              "Value #URP": "Under-replicated",
+              "Value #OFF": "Offline",
+              "Value #CTRL": "Active controllers",
+              "Value #BIN": "Bytes in/s",
+              "Value #BOUT": "Bytes out/s",
+              "Value #TOPICS": "Topics"
+            },
+            "indexByName": {
+              "Cluster": 0,
+              "Under-replicated": 1,
+              "Offline": 2,
+              "Active controllers": 3,
+              "Bytes in/s": 4,
+              "Bytes out/s": 5,
+              "Topics": 6
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Offline",
+                "desc": true
+              },
+              {
+                "field": "Under-replicated",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false,
+            "minWidth": 120
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Offline"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Under-replicated"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    },
+                    {
+                      "color": "red",
+                      "value": 50
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Active controllers"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    },
+                    {
+                      "color": "red",
+                      "value": 2
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bytes in/s"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "Bps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bytes out/s"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "Bps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cluster"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open Hot Topics dashboard for ${__value.text}",
+                    "url": "/d/lenseiq-hot-topics/lenseiq-kafka-hot-topics?var-cluster=${__value.text}&var-env=${env}",
+                    "targetBlank": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        }
+      }
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "kafka",
+    "lenseiq",
+    "executive",
+    "overview"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "label": "Prometheus",
+        "type": "datasource",
+        "query": "prometheus",
+        "refresh": 1,
+        "current": {
+          "selected": true,
+          "text": "Prometheus",
+          "value": "PROMETHEUS_LOCAL"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "options": [],
+        "skipUrlSync": false
+      },
+      {
+        "name": "env",
+        "label": "Environment",
+        "type": "custom",
+        "query": "PROD,UAT,DEV",
+        "current": {
+          "selected": true,
+          "text": "PROD",
+          "value": "PROD"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "options": [
+          {
+            "selected": true,
+            "text": "PROD",
+            "value": "PROD"
+          },
+          {
+            "selected": false,
+            "text": "UAT",
+            "value": "UAT"
+          },
+          {
+            "selected": false,
+            "text": "DEV",
+            "value": "DEV"
+          }
+        ],
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "1h"
+    ],
+    "time_options": [
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "14d",
+      "30d"
+    ]
+  },
+  "timezone": "browser",
+  "title": "LenseIQ \u2014 Executive Overview",
+  "uid": "lenseiq-exec-overview",
+  "version": 1,
+  "weekStart": ""
+}

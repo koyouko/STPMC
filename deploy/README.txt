@@ -50,9 +50,21 @@ Option 2: External PostgreSQL (production / RHEL 8)
   ./start.sh start
   (postgres profile is auto-activated when DB_URL contains "postgresql")
 
-First run: Tables are created automatically (ddl-auto=update).
-Production: After initial setup, set HIBERNATE_DDL_AUTO=validate
-            to prevent schema changes on startup.
+Option 3: External Oracle (production / RHEL 8)
+  See oracle-database-team-request.md for the DB team setup request
+  and email template.
+  sqlplus your_user/your_password@//your-host:1521/YOUR_SERVICE @oracle-schema.sql
+  DB_URL=jdbc:oracle:thin:@//your-host:1521/YOUR_SERVICE \
+  DB_USERNAME=your_user \
+  DB_PASSWORD=your_password \
+  SPRING_PROFILES_ACTIVE=oracle \
+  HIBERNATE_DDL_AUTO=validate \
+  ./start.sh start
+  (oracle profile is auto-activated when DB_URL starts with "jdbc:oracle")
+
+PostgreSQL first run: Tables are created automatically when ddl-auto=update.
+Oracle production: Create or migrate the schema separately, then keep
+                   HIBERNATE_DDL_AUTO=validate.
 
 Migration note: If upgrading from a previous version, run:
   ALTER TABLE clusters ADD COLUMN jmx_cluster_id VARCHAR(255);

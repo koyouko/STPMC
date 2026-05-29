@@ -1,0 +1,11 @@
+LenseIQ Grafana / Prometheus Export Bundle
+
+dashboards/kafka-hot-topics.json
+dashboards/kafka-executive-overview.json
+grafana-provisioning/datasources/prometheus.yml
+grafana-provisioning/dashboards/dashboards.yml
+prometheus/kafka-scrape-example.yml
+jmx-exporter/kafka-jmx-exporter.yml
+reference/kafka-hot-topics-reference.html
+reference/kafka-executive-overview-reference.html
+README.md

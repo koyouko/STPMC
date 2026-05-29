@@ -1,0 +1,49 @@
+# Example Prometheus scrape config for Kafka brokers exposing JMX exporter metrics.
+# Merge this into your prometheus.yml and adjust targets/job labels.
+
+scrape_configs:
+  - job_name: CHANNELS_NAM_PROD_COB_PHY
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - broker-1.example.com:9404
+          - broker-2.example.com:9404
+          - broker-3.example.com:9404
+        labels:
+          env: PROD
+
+    # The dashboards use lower-case metric names. Keep this section if your
+    # JMX exporter emits PascalCase names from the included exporter config.
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: kafka_controller_KafkaController_ActiveControllerCount
+        target_label: __name__
+        replacement: kafka_controller_kafkacontroller_activecontrollercount
+      - source_labels: [__name__]
+        regex: kafka_controller_KafkaController_OfflinePartitionsCount
+        target_label: __name__
+        replacement: kafka_controller_kafkacontroller_offlinepartitionscount
+      - source_labels: [__name__]
+        regex: kafka_server_ReplicaManager_UnderReplicatedPartitions
+        target_label: __name__
+        replacement: kafka_server_replicamanager_underreplicatedpartitions
+      - source_labels: [__name__]
+        regex: kafka_server_BrokerTopicMetrics_BytesInPerSec_OneMinuteRate
+        target_label: __name__
+        replacement: kafka_server_brokertopicmetrics_bytesinpersec_oneminuterate
+      - source_labels: [__name__]
+        regex: kafka_server_BrokerTopicMetrics_BytesOutPerSec_OneMinuteRate
+        target_label: __name__
+        replacement: kafka_server_brokertopicmetrics_bytesoutpersec_oneminuterate
+      - source_labels: [__name__]
+        regex: kafka_server_BrokerTopicMetrics_MessagesInPerSec_OneMinuteRate
+        target_label: __name__
+        replacement: kafka_server_brokertopicmetrics_messagesinpersec_oneminuterate
+      - source_labels: [__name__]
+        regex: kafka_server_BrokerTopicMetrics_TotalProduceRequestsPerSec_OneMinuteRate
+        target_label: __name__
+        replacement: kafka_server_brokertopicmetrics_totalproducerequestspersec_oneminuterate
+      - source_labels: [__name__]
+        regex: kafka_server_BrokerTopicMetrics_TotalFetchRequestsPerSec_OneMinuteRate
+        target_label: __name__
+        replacement: kafka_server_brokertopicmetrics_totalfetchrequestspersec_oneminuterate

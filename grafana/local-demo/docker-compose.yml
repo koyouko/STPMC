@@ -1,0 +1,77 @@
+name: lenseiq-hot-topics-demo
+
+services:
+  # 1) Generate 30 days of synthetic history as an OpenMetrics file.
+  gen-history:
+    build: ./exporter
+    command: ["python3", "generate_history.py", "/history/history.txt"]
+    volumes:
+      - history:/history
+
+  # 2) Backfill that history into the Prometheus TSDB (runs once, then exits).
+  backfill:
+    image: prom/prometheus:v2.54.1
+    entrypoint: ["/bin/promtool"]
+    command:
+      - tsdb
+      - create-blocks-from
+      - openmetrics
+      - /history/history.txt
+      - /prometheus
+    volumes:
+      - history:/history:ro
+      - prom-data:/prometheus
+    depends_on:
+      gen-history:
+        condition: service_completed_successfully
+
+  # 3) Live exporter — serves "now" values continuously.
+  exporter:
+    build: ./exporter
+    restart: unless-stopped
+
+  # 4) Prometheus — loads backfilled blocks + scrapes the live exporter.
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=60d
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom-data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      backfill:
+        condition: service_completed_successfully
+      exporter:
+        condition: service_started
+    restart: unless-stopped
+
+  # 5) Grafana — datasource + both dashboards provisioned automatically.
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_USERS_DEFAULT_THEME=dark
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/json/kafka-executive-overview.json
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  history:
+  prom-data:
+  grafana-data:
