@@ -1,6 +1,11 @@
 # Oracle profile — activate with --spring.profiles.active=oracle
 # Override DB_URL, DB_USERNAME, and DB_PASSWORD for your Oracle service.
+# DB_SCHEMA is the schema that owns the application tables.
 # Example URL: jdbc:oracle:thin:@//db-host.example.com:1521/FREEPDB1
+
+app:
+  datasource:
+    schema: ${DB_SCHEMA:STP_KAFKA_HC_MISSION_CONTROL}
 
 spring:
   datasource:
@@ -13,6 +18,7 @@ spring:
       minimum-idle: ${DB_MIN_IDLE:2}
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:20000}
       idle-timeout: ${DB_IDLE_TIMEOUT_MS:300000}
+      connection-init-sql: "ALTER SESSION SET CURRENT_SCHEMA=${app.datasource.schema}"
   h2:
     console:
       enabled: false
@@ -22,4 +28,5 @@ spring:
       ddl-auto: ${HIBERNATE_DDL_AUTO:validate}
     properties:
       hibernate:
+        default_schema: ${app.datasource.schema}
         format_sql: true

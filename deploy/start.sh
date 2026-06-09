@@ -213,7 +213,8 @@ case "${1:-start}" in
     echo "    APP_SEED_DEMO_DATA=true             Seed demo data"
     echo "    DB_URL=jdbc:postgresql://...        PostgreSQL JDBC URL"
     echo "    DB_URL=jdbc:oracle:thin:@//...      Oracle JDBC URL"
-    echo "    DB_USERNAME / DB_PASSWORD            Database credentials"
+    echo "    DB_USERNAME / DB_PASSWORD            Database login credentials"
+    echo "    DB_SCHEMA=STP_KAFKA_HC_...          Oracle schema that owns app tables"
     exit 1
     ;;
 esac

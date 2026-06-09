@@ -101,15 +101,30 @@ Activate the `oracle` Spring profile to connect the backend to Oracle:
 DB_URL=jdbc:oracle:thin:@//your-host:1521/YOUR_SERVICE \
 DB_USERNAME=STP_KAFKA_HC_MISSION_CONTROL \
 DB_PASSWORD=your_password \
+DB_SCHEMA=STP_KAFKA_HC_MISSION_CONTROL \
 SPRING_PROFILES_ACTIVE=oracle \
 HIBERNATE_DDL_AUTO=validate \
 ./deploy/start.sh start
 ```
 
-Update the connection by setting `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` in
-the runtime environment. Do not hardcode the real password in
+Update the connection by setting `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, and
+`DB_SCHEMA` in the runtime environment. `DB_USERNAME` is the login account.
+`DB_SCHEMA` is the Oracle schema that owns the tables. Do not hardcode the real
+password in
 `application-oracle.yml` or commit it to git. For production, put `DB_PASSWORD`
 in the approved secret store, service manager, or deployment environment.
+
+If you must log in with the AD / Windows account `stcmc`, keep the application
+schema separate:
+
+```bash
+DB_USERNAME=stcmc
+DB_SCHEMA=STP_KAFKA_HC_MISSION_CONTROL
+```
+
+The `stcmc` account must have direct `SELECT`, `INSERT`, `UPDATE`, and `DELETE`
+grants on the `STP_KAFKA_HC_MISSION_CONTROL` tables. The Oracle profile runs
+`ALTER SESSION SET CURRENT_SCHEMA=$DB_SCHEMA` for each connection.
 
 For local Maven testing, use the same variables:
 
@@ -119,6 +134,7 @@ SPRING_PROFILES_ACTIVE=oracle \
 DB_URL=jdbc:oracle:thin:@//your-host:1521/YOUR_SERVICE \
 DB_USERNAME=STP_KAFKA_HC_MISSION_CONTROL \
 DB_PASSWORD=your_password \
+DB_SCHEMA=STP_KAFKA_HC_MISSION_CONTROL \
 HIBERNATE_DDL_AUTO=validate \
 ./mvnw spring-boot:run
 ```
@@ -129,6 +145,16 @@ For a fresh Oracle schema, apply the included DDL first:
 
 ```bash
 sqlplus STP_KAFKA_HC_MISSION_CONTROL/your_password@//your-host:1521/YOUR_SERVICE @deploy/oracle-schema.sql
+```
+
+If startup fails with `Schema-validation: missing table [audit_events]`, the
+app is connected to Oracle but the schema it is validating does not contain the
+tables. Confirm the DDL was applied and that `DB_SCHEMA` points to the owner:
+
+```sql
+SELECT owner, table_name
+FROM all_tables
+WHERE table_name = 'AUDIT_EVENTS';
 ```
 
 If startup fails with `Failed to load driver class oracle.jdbc.OracleDriver`,

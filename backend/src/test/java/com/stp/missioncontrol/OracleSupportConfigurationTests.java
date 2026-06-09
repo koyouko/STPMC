@@ -25,7 +25,10 @@ class OracleSupportConfigurationTests {
         assertThat(oracleProfile).contains("jdbc:oracle:thin:@//");
         assertThat(oracleProfile).contains("STP_KAFKA_HC_MISSION_CONTROL");
         assertThat(oracleProfile).contains("driver-class-name: oracle.jdbc.OracleDriver");
+        assertThat(oracleProfile).contains("schema: ${DB_SCHEMA:STP_KAFKA_HC_MISSION_CONTROL}");
+        assertThat(oracleProfile).contains("connection-init-sql: \"ALTER SESSION SET CURRENT_SCHEMA=${app.datasource.schema}\"");
         assertThat(oracleProfile).contains("database-platform: org.hibernate.dialect.OracleDialect");
+        assertThat(oracleProfile).contains("default_schema: ${app.datasource.schema}");
         assertThat(oracleProfile).contains("ddl-auto: ${HIBERNATE_DDL_AUTO:validate}");
     }
 
@@ -36,6 +39,7 @@ class OracleSupportConfigurationTests {
         assertThat(startScript).contains("jdbc:oracle");
         assertThat(startScript).contains("PROFILES=\"${PROFILES:+$PROFILES,}oracle\"");
         assertThat(startScript).contains("Oracle (${DB_URL:-external datasource})");
+        assertThat(startScript).contains("DB_SCHEMA");
     }
 
     @Test
@@ -55,9 +59,11 @@ class OracleSupportConfigurationTests {
 
         assertThat(readme).contains("SPRING_PROFILES_ACTIVE=oracle");
         assertThat(readme).contains("STP_KAFKA_HC_MISSION_CONTROL");
+        assertThat(readme).contains("DB_SCHEMA");
         assertThat(readme).contains("jdbc:oracle:thin:@//");
         assertThat(deployReadme).contains("SPRING_PROFILES_ACTIVE=oracle");
         assertThat(deployReadme).contains("STP_KAFKA_HC_MISSION_CONTROL");
+        assertThat(deployReadme).contains("DB_SCHEMA");
         assertThat(deployReadme).contains("jdbc:oracle:thin:@//");
     }
 

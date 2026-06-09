@@ -137,8 +137,23 @@ SPRING_PROFILES_ACTIVE=oracle
 DB_URL=jdbc:oracle:thin:@//<oracle-host>:<port>/<service-name>
 DB_USERNAME=STP_KAFKA_HC_MISSION_CONTROL
 DB_PASSWORD=<provided-through-secret-vault>
+DB_SCHEMA=STP_KAFKA_HC_MISSION_CONTROL
 HIBERNATE_DDL_AUTO=validate
 ```
+
+`DB_USERNAME` is the login account. `DB_SCHEMA` is the schema that owns the
+application tables. If the runtime login is an AD / Windows account such as
+`stcmc`, the application will still use:
+
+```bash
+DB_USERNAME=stcmc
+DB_SCHEMA=STP_KAFKA_HC_MISSION_CONTROL
+```
+
+In that case, please grant the login account direct `SELECT`, `INSERT`,
+`UPDATE`, and `DELETE` privileges on all application tables. The Oracle profile
+sets `ALTER SESSION SET CURRENT_SCHEMA=$DB_SCHEMA` for each connection and
+Hibernate validates against `DB_SCHEMA`.
 
 For TCPS / wallet-based access, please provide the enterprise-approved JDBC URL,
 wallet location requirements, and any JVM properties required by the platform.
