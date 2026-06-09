@@ -69,17 +69,33 @@ class OracleSupportConfigurationTests {
     void operatorDocsDescribeOracleStartupPath() throws IOException {
         String readme = read("../README.md");
         String deployReadme = read("../deploy/README.txt");
+        String databaseRequest = read("../deploy/oracle-database-team-request.md");
 
         assertThat(readme).contains("SPRING_PROFILES_ACTIVE=oracle");
         assertThat(readme).contains("STP_KAFKA_HC_MISSION_CONTROL");
         assertThat(readme).contains("DB_SCHEMA");
         assertThat(readme).contains("DB_TABLE_PREFIX");
         assertThat(readme).contains("jdbc:oracle:thin:@//");
+        assertThat(readme).contains("deploy/oracle-capacity-plan.md");
         assertThat(deployReadme).contains("SPRING_PROFILES_ACTIVE=oracle");
         assertThat(deployReadme).contains("STP_KAFKA_HC_MISSION_CONTROL");
         assertThat(deployReadme).contains("DB_SCHEMA");
         assertThat(deployReadme).contains("DB_TABLE_PREFIX");
         assertThat(deployReadme).contains("jdbc:oracle:thin:@//");
+        assertThat(deployReadme).contains("oracle-capacity-plan.md");
+        assertThat(databaseRequest).contains("oracle-capacity-plan.md");
+    }
+
+    @Test
+    void oracleCapacityPlanDocumentsGrowthDriversAndForecasts() throws IOException {
+        String capacityPlan = read("../deploy/oracle-capacity-plan.md");
+
+        assertThat(capacityPlan).contains("STP_Kafka_HC_health_refresh_operations");
+        assertThat(capacityPlan).contains("STP_Kafka_HC_audit_events");
+        assertThat(capacityPlan).contains("60 seconds");
+        assertThat(capacityPlan).contains("Expected production");
+        assertThat(capacityPlan).contains("633 MB");
+        assertThat(capacityPlan).contains("DB_POOL_SIZE=10");
     }
 
     private static String read(String path) throws IOException {

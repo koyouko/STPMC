@@ -152,6 +152,10 @@ For a fresh Oracle schema, apply the included DDL first:
 sqlplus STP_KAFKA_HC_MISSION_CONTROL/your_password@//your-host:1521/YOUR_SERVICE @deploy/oracle-schema.sql
 ```
 
+For Oracle DBA sizing, send `deploy/oracle-capacity-plan.md` with the schema
+request. It includes the expected row-growth formula, default 60-second health
+poll assumptions, retention guidance, and tablespace sizing scenarios.
+
 If startup fails with `Schema-validation: missing table [STP_Kafka_HC_audit_events]`,
 the app is connected to Oracle but the schema it is validating does not contain
 the prefixed tables. Confirm the DDL was applied and that `DB_SCHEMA` and

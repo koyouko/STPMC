@@ -26,7 +26,8 @@ uses the `oracle` Spring profile, the Oracle JDBC `ojdbc11` driver, and
 | Schema/user naming prefix | `STP_Kafka_HC_` |
 | Suggested schema/user | `STP_KAFKA_HC_MISSION_CONTROL` or DB-team approved equivalent with the required prefix |
 | Runtime DDL mode | No application DDL; Hibernate runs with `validate` |
-| Initial storage | Small application schema; 5 GB initial allocation is enough unless local policy requires another size |
+| Capacity forecast | See `deploy/oracle-capacity-plan.md`; expected production at 100 active clusters is about 633 MB/day without purging |
+| Initial storage | 100 GB with autoextend for expected production with retention; 300 GB with autoextend if retaining one year of scheduler/audit history without purge |
 
 ## Accounts And Access
 
@@ -128,6 +129,28 @@ Objects created by the script:
 No stored procedures, triggers, sequences, database links, or scheduled database
 jobs are required.
 
+## Capacity Forecast
+
+A standalone capacity forecast is included with the deployment package:
+
+```text
+deploy/oracle-capacity-plan.md
+```
+
+Summary for default settings:
+
+- The app does not store Kafka messages, Kafka topic payloads, Prometheus
+  time-series samples, or scraped broker metric history.
+- Most tables are configuration/current-state tables and remain small.
+- Growth comes mainly from `STP_Kafka_HC_health_refresh_operations` and
+  `STP_Kafka_HC_audit_events`.
+- At the default 60-second health poll interval, each active cluster creates
+  about 1,440 refresh operation rows and 1,440 audit rows per day.
+- At 100 active clusters, plan for about 288,000 growing rows/day and about
+  633 MB/day of conservative table/index growth if no purge is applied.
+- Recommended retention is 90 days for health refresh operations and 365 days,
+  or enterprise audit policy, for audit events.
+
 ## Runtime Connection Settings
 
 The application will be configured with these environment variables:
@@ -228,6 +251,8 @@ Requested setup:
   modify schema objects at startup.
 - DDL: please apply the attached `oracle-schema.sql` as the application schema
   owner.
+- Capacity: please review the attached `oracle-capacity-plan.md` for expected
+  data growth and retention assumptions.
 - Network: allow the application host/subnet `<application-host-or-subnet>` to
   connect to the Oracle listener.
 
