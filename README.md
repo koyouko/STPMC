@@ -106,6 +106,23 @@ HIBERNATE_DDL_AUTO=validate \
 ./deploy/start.sh start
 ```
 
+Update the connection by setting `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` in
+the runtime environment. Do not hardcode the real password in
+`application-oracle.yml` or commit it to git. For production, put `DB_PASSWORD`
+in the approved secret store, service manager, or deployment environment.
+
+For local Maven testing, use the same variables:
+
+```bash
+cd backend
+SPRING_PROFILES_ACTIVE=oracle \
+DB_URL=jdbc:oracle:thin:@//your-host:1521/YOUR_SERVICE \
+DB_USERNAME=STP_KAFKA_HC_MISSION_CONTROL \
+DB_PASSWORD=your_password \
+HIBERNATE_DDL_AUTO=validate \
+./mvnw spring-boot:run
+```
+
 The Linux launcher also auto-activates the `oracle` profile when `DB_URL` starts with `jdbc:oracle`. See `application-oracle.yml` for all configurable settings. The default Oracle schema/user is `STP_KAFKA_HC_MISSION_CONTROL`, matching the requested `STP_Kafka_HC_` naming prefix without quoted Oracle identifiers. For production Oracle schemas, keep `HIBERNATE_DDL_AUTO=validate` and apply reviewed DDL migrations outside application startup.
 
 For a fresh Oracle schema, apply the included DDL first:

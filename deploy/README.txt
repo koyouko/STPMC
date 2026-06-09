@@ -61,6 +61,8 @@ Option 3: External Oracle (production / RHEL 8)
   HIBERNATE_DDL_AUTO=validate \
   ./start.sh start
   (oracle profile is auto-activated when DB_URL starts with "jdbc:oracle")
+  Update DB_URL, DB_USERNAME, and DB_PASSWORD in the runtime environment.
+  Do not hardcode real passwords in application-oracle.yml or commit them.
 
 PostgreSQL first run: Tables are created automatically when ddl-auto=update.
 Oracle production: Create or migrate the schema separately, then keep
