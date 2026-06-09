@@ -131,6 +131,12 @@ For a fresh Oracle schema, apply the included DDL first:
 sqlplus STP_KAFKA_HC_MISSION_CONTROL/your_password@//your-host:1521/YOUR_SERVICE @deploy/oracle-schema.sql
 ```
 
+If startup fails with `Failed to load driver class oracle.jdbc.OracleDriver`,
+the running `mission-control.jar` is old and does not include the Oracle JDBC
+driver. Delete `deploy/mission-control.jar` and run `deploy/start.sh` or
+`deploy/start.bat` again to reassemble it from the updated split parts, or
+rebuild the bundle with `bash deploy/build-bundle.sh`.
+
 ### Windows backend commands
 
 Use the Maven wrapper on Windows like this:

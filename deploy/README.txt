@@ -68,5 +68,11 @@ PostgreSQL first run: Tables are created automatically when ddl-auto=update.
 Oracle production: Create or migrate the schema separately, then keep
                    HIBERNATE_DDL_AUTO=validate.
 
+Oracle troubleshooting: If startup fails with
+  Failed to load driver class oracle.jdbc.OracleDriver
+delete the old deploy/mission-control.jar and run start.sh/start.bat again,
+or rebuild from source with:
+  bash deploy/build-bundle.sh
+
 Migration note: If upgrading from a previous version, run:
   ALTER TABLE clusters ADD COLUMN jmx_cluster_id VARCHAR(255);
