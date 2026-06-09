@@ -26,10 +26,21 @@ class OracleSupportConfigurationTests {
         assertThat(oracleProfile).contains("STP_KAFKA_HC_MISSION_CONTROL");
         assertThat(oracleProfile).contains("driver-class-name: oracle.jdbc.OracleDriver");
         assertThat(oracleProfile).contains("schema: ${DB_SCHEMA:STP_KAFKA_HC_MISSION_CONTROL}");
+        assertThat(oracleProfile).contains("table-prefix: ${DB_TABLE_PREFIX:STP_Kafka_HC_}");
         assertThat(oracleProfile).contains("connection-init-sql: \"ALTER SESSION SET CURRENT_SCHEMA=${app.datasource.schema}\"");
         assertThat(oracleProfile).contains("database-platform: org.hibernate.dialect.OracleDialect");
+        assertThat(oracleProfile).contains("table_prefix: ${app.datasource.table-prefix}");
         assertThat(oracleProfile).contains("default_schema: ${app.datasource.schema}");
         assertThat(oracleProfile).contains("ddl-auto: ${HIBERNATE_DDL_AUTO:validate}");
+    }
+
+    @Test
+    void oracleTablePrefixNamingStrategyIsWiredThroughHibernateCustomizer() throws IOException {
+        String namingConfiguration = read("src/main/java/com/stp/missioncontrol/config/HibernateNamingConfiguration.java");
+
+        assertThat(namingConfiguration).contains("AvailableSettings.PHYSICAL_NAMING_STRATEGY");
+        assertThat(namingConfiguration).contains("TablePrefixPhysicalNamingStrategy");
+        assertThat(namingConfiguration).contains("app.datasource.table-prefix");
     }
 
     @Test
@@ -49,7 +60,9 @@ class OracleSupportConfigurationTests {
         assertThat(oracleSchema).contains("RAW(16)");
         assertThat(oracleSchema).contains("NUMBER(1)");
         assertThat(oracleSchema).contains("TIMESTAMP(6) WITH TIME ZONE");
-        assertThat(oracleSchema).contains("CREATE TABLE service_account_cluster_ids");
+        assertThat(oracleSchema).contains("CREATE TABLE STP_Kafka_HC_audit_events");
+        assertThat(oracleSchema).contains("CREATE TABLE STP_Kafka_HC_service_account_cluster_ids");
+        assertThat(oracleSchema).doesNotContain("CREATE TABLE audit_events");
     }
 
     @Test
@@ -60,10 +73,12 @@ class OracleSupportConfigurationTests {
         assertThat(readme).contains("SPRING_PROFILES_ACTIVE=oracle");
         assertThat(readme).contains("STP_KAFKA_HC_MISSION_CONTROL");
         assertThat(readme).contains("DB_SCHEMA");
+        assertThat(readme).contains("DB_TABLE_PREFIX");
         assertThat(readme).contains("jdbc:oracle:thin:@//");
         assertThat(deployReadme).contains("SPRING_PROFILES_ACTIVE=oracle");
         assertThat(deployReadme).contains("STP_KAFKA_HC_MISSION_CONTROL");
         assertThat(deployReadme).contains("DB_SCHEMA");
+        assertThat(deployReadme).contains("DB_TABLE_PREFIX");
         assertThat(deployReadme).contains("jdbc:oracle:thin:@//");
     }
 

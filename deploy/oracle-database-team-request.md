@@ -108,20 +108,20 @@ The schema uses these Oracle data types:
 
 Objects created by the script:
 
-- `clusters`
-- `cluster_auth_profiles`
-- `cluster_listeners`
-- `service_endpoints`
-- `cluster_health_snapshots`
-- `component_health_snapshots`
-- `service_accounts`
-- `service_account_scopes`
-- `service_account_environments`
-- `service_account_cluster_ids`
-- `service_account_tokens`
-- `audit_events`
-- `health_refresh_operations`
-- `metrics_targets`
+- `STP_Kafka_HC_clusters`
+- `STP_Kafka_HC_cluster_auth_profiles`
+- `STP_Kafka_HC_cluster_listeners`
+- `STP_Kafka_HC_service_endpoints`
+- `STP_Kafka_HC_cluster_health_snapshots`
+- `STP_Kafka_HC_component_health_snapshots`
+- `STP_Kafka_HC_service_accounts`
+- `STP_Kafka_HC_service_account_scopes`
+- `STP_Kafka_HC_service_account_environments`
+- `STP_Kafka_HC_service_account_cluster_ids`
+- `STP_Kafka_HC_service_account_tokens`
+- `STP_Kafka_HC_audit_events`
+- `STP_Kafka_HC_health_refresh_operations`
+- `STP_Kafka_HC_metrics_targets`
 - Supporting primary keys, foreign keys, unique constraints, check constraints,
   and indexes.
 
@@ -138,16 +138,19 @@ DB_URL=jdbc:oracle:thin:@//<oracle-host>:<port>/<service-name>
 DB_USERNAME=STP_KAFKA_HC_MISSION_CONTROL
 DB_PASSWORD=<provided-through-secret-vault>
 DB_SCHEMA=STP_KAFKA_HC_MISSION_CONTROL
+DB_TABLE_PREFIX=STP_Kafka_HC_
 HIBERNATE_DDL_AUTO=validate
 ```
 
 `DB_USERNAME` is the login account. `DB_SCHEMA` is the schema that owns the
-application tables. If the runtime login is an AD / Windows account such as
-`stcmc`, the application will still use:
+application tables. `DB_TABLE_PREFIX` is the required table-name prefix, so the
+application validates tables such as `STP_Kafka_HC_audit_events`. If the runtime
+login is an AD / Windows account such as `stcmc`, the application will still use:
 
 ```bash
 DB_USERNAME=stcmc
 DB_SCHEMA=STP_KAFKA_HC_MISSION_CONTROL
+DB_TABLE_PREFIX=STP_Kafka_HC_
 ```
 
 In that case, please grant the login account direct `SELECT`, `INSERT`,
@@ -177,15 +180,15 @@ After the schema is created, these checks should succeed:
 SELECT table_name
 FROM user_tables
 WHERE table_name IN (
-  'CLUSTERS',
-  'SERVICE_ACCOUNTS',
-  'AUDIT_EVENTS',
-  'METRICS_TARGETS'
+  'STP_KAFKA_HC_CLUSTERS',
+  'STP_KAFKA_HC_SERVICE_ACCOUNTS',
+  'STP_KAFKA_HC_AUDIT_EVENTS',
+  'STP_KAFKA_HC_METRICS_TARGETS'
 )
 ORDER BY table_name;
 
-SELECT COUNT(*) FROM clusters;
-SELECT COUNT(*) FROM metrics_targets;
+SELECT COUNT(*) FROM STP_Kafka_HC_clusters;
+SELECT COUNT(*) FROM STP_Kafka_HC_metrics_targets;
 ```
 
 The application startup check should also pass with:

@@ -6,6 +6,7 @@
 app:
   datasource:
     schema: ${DB_SCHEMA:STP_KAFKA_HC_MISSION_CONTROL}
+    table-prefix: ${DB_TABLE_PREFIX:STP_Kafka_HC_}
 
 spring:
   datasource:
@@ -28,5 +29,6 @@ spring:
       ddl-auto: ${HIBERNATE_DDL_AUTO:validate}
     properties:
       hibernate:
+        table_prefix: ${app.datasource.table-prefix}
         default_schema: ${app.datasource.schema}
         format_sql: true

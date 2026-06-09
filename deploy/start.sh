@@ -215,6 +215,7 @@ case "${1:-start}" in
     echo "    DB_URL=jdbc:oracle:thin:@//...      Oracle JDBC URL"
     echo "    DB_USERNAME / DB_PASSWORD            Database login credentials"
     echo "    DB_SCHEMA=STP_KAFKA_HC_...          Oracle schema that owns app tables"
+    echo "    DB_TABLE_PREFIX=STP_Kafka_HC_       Oracle application table prefix"
     exit 1
     ;;
 esac
