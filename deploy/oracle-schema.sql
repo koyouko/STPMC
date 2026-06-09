@@ -1,5 +1,6 @@
 -- Oracle schema for STP Kafka Mission Control.
 -- Run as the application schema owner before starting with HIBERNATE_DDL_AUTO=validate.
+-- Recommended schema/user: STP_KAFKA_HC_MISSION_CONTROL.
 -- UUID identifiers are stored as RAW(16), booleans as NUMBER(1), and Java Instant values
 -- as TIMESTAMP(6) WITH TIME ZONE.
 

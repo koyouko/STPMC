@@ -23,7 +23,8 @@ uses the `oracle` Spring profile, the Oracle JDBC `ojdbc11` driver, and
 | Service name | To be provided by DB team |
 | Listener protocol | `TCP` or `TCPS`, per enterprise standard |
 | Listener port | Usually `1521` for TCP or enterprise TCPS port |
-| Suggested schema/user | `MISSION_CONTROL` or DB-team approved equivalent |
+| Schema/user naming prefix | `STP_Kafka_HC_` |
+| Suggested schema/user | `STP_KAFKA_HC_MISSION_CONTROL` or DB-team approved equivalent with the required prefix |
 | Runtime DDL mode | No application DDL; Hibernate runs with `validate` |
 | Initial storage | Small application schema; 5 GB initial allocation is enough unless local policy requires another size |
 
@@ -35,11 +36,16 @@ Please create an Oracle application schema/user for the backend service. The
 default name used by the deployment examples is:
 
 ```text
-MISSION_CONTROL
+STP_KAFKA_HC_MISSION_CONTROL
 ```
 
-If the DB team uses a different username, the deployment can override it with
+If the DB team uses a different username, it must start with the requested
+`STP_Kafka_HC_` prefix. The deployment can override the final value with
 `DB_USERNAME`.
+
+Oracle normalizes unquoted usernames to uppercase. The recommended unquoted
+schema/user is therefore `STP_KAFKA_HC_MISSION_CONTROL`, which follows the
+requested prefix convention without requiring quoted identifiers.
 
 The application should connect as the schema owner unless the DB team creates
 synonyms or another approved default-schema pattern. The current application
@@ -86,7 +92,7 @@ deploy/oracle-schema.sql
 Preferred execution pattern:
 
 ```bash
-sqlplus MISSION_CONTROL/<password>@//<oracle-host>:<port>/<service-name> @deploy/oracle-schema.sql
+sqlplus STP_KAFKA_HC_MISSION_CONTROL/<password>@//<oracle-host>:<port>/<service-name> @deploy/oracle-schema.sql
 ```
 
 If the DB team runs the script from an administrative account, please ensure the
@@ -129,7 +135,7 @@ The application will be configured with these environment variables:
 ```bash
 SPRING_PROFILES_ACTIVE=oracle
 DB_URL=jdbc:oracle:thin:@//<oracle-host>:<port>/<service-name>
-DB_USERNAME=<application-schema-user>
+DB_USERNAME=STP_KAFKA_HC_MISSION_CONTROL
 DB_PASSWORD=<provided-through-secret-vault>
 HIBERNATE_DDL_AUTO=validate
 ```
@@ -178,7 +184,7 @@ HIBERNATE_DDL_AUTO=validate
 Please provide:
 
 - Oracle host, port, and service name.
-- Final application schema/user name.
+- Final application schema/user name, starting with `STP_Kafka_HC_`.
 - Confirmation that `deploy/oracle-schema.sql` has been applied.
 - Confirmation that AD / Windows account `stcmc` can log in.
 - Secret-vault reference or approved handoff method for runtime credentials.
@@ -196,7 +202,8 @@ Control backend in `<environment>`?
 
 Requested setup:
 
-- Application/schema user: `MISSION_CONTROL` or your approved naming standard.
+- Application/schema user: `STP_KAFKA_HC_MISSION_CONTROL` or your approved name
+  starting with `STP_Kafka_HC_`.
 - Oracle version: 19c or newer preferred.
 - Character set: AL32UTF8 preferred.
 - Runtime mode: application will use Hibernate `validate`; it will not create or

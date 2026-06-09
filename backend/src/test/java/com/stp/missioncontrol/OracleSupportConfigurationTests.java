@@ -23,6 +23,7 @@ class OracleSupportConfigurationTests {
         String oracleProfile = read("src/main/resources/application-oracle.yml");
 
         assertThat(oracleProfile).contains("jdbc:oracle:thin:@//");
+        assertThat(oracleProfile).contains("STP_KAFKA_HC_MISSION_CONTROL");
         assertThat(oracleProfile).contains("driver-class-name: oracle.jdbc.OracleDriver");
         assertThat(oracleProfile).contains("database-platform: org.hibernate.dialect.OracleDialect");
         assertThat(oracleProfile).contains("ddl-auto: ${HIBERNATE_DDL_AUTO:validate}");
@@ -53,8 +54,10 @@ class OracleSupportConfigurationTests {
         String deployReadme = read("../deploy/README.txt");
 
         assertThat(readme).contains("SPRING_PROFILES_ACTIVE=oracle");
+        assertThat(readme).contains("STP_KAFKA_HC_MISSION_CONTROL");
         assertThat(readme).contains("jdbc:oracle:thin:@//");
         assertThat(deployReadme).contains("SPRING_PROFILES_ACTIVE=oracle");
+        assertThat(deployReadme).contains("STP_KAFKA_HC_MISSION_CONTROL");
         assertThat(deployReadme).contains("jdbc:oracle:thin:@//");
     }
 

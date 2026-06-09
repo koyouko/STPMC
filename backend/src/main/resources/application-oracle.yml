@@ -5,7 +5,7 @@
 spring:
   datasource:
     url: ${DB_URL:jdbc:oracle:thin:@//localhost:1521/FREEPDB1}
-    username: ${DB_USERNAME:mission_control}
+    username: ${DB_USERNAME:STP_KAFKA_HC_MISSION_CONTROL}
     password: ${DB_PASSWORD:mission_control}
     driver-class-name: oracle.jdbc.OracleDriver
     hikari:

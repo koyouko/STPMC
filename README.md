@@ -99,19 +99,19 @@ Activate the `oracle` Spring profile to connect the backend to Oracle:
 
 ```bash
 DB_URL=jdbc:oracle:thin:@//your-host:1521/YOUR_SERVICE \
-DB_USERNAME=your_user \
+DB_USERNAME=STP_KAFKA_HC_MISSION_CONTROL \
 DB_PASSWORD=your_password \
 SPRING_PROFILES_ACTIVE=oracle \
 HIBERNATE_DDL_AUTO=validate \
 ./deploy/start.sh start
 ```
 
-The Linux launcher also auto-activates the `oracle` profile when `DB_URL` starts with `jdbc:oracle`. See `application-oracle.yml` for all configurable settings. For production Oracle schemas, keep `HIBERNATE_DDL_AUTO=validate` and apply reviewed DDL migrations outside application startup.
+The Linux launcher also auto-activates the `oracle` profile when `DB_URL` starts with `jdbc:oracle`. See `application-oracle.yml` for all configurable settings. The default Oracle schema/user is `STP_KAFKA_HC_MISSION_CONTROL`, matching the requested `STP_Kafka_HC_` naming prefix without quoted Oracle identifiers. For production Oracle schemas, keep `HIBERNATE_DDL_AUTO=validate` and apply reviewed DDL migrations outside application startup.
 
 For a fresh Oracle schema, apply the included DDL first:
 
 ```bash
-sqlplus your_user/your_password@//your-host:1521/YOUR_SERVICE @deploy/oracle-schema.sql
+sqlplus STP_KAFKA_HC_MISSION_CONTROL/your_password@//your-host:1521/YOUR_SERVICE @deploy/oracle-schema.sql
 ```
 
 ### Windows backend commands
