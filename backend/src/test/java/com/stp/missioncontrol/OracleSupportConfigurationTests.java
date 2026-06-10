@@ -66,6 +66,16 @@ class OracleSupportConfigurationTests {
     }
 
     @Test
+    void oracleSchemaMatchesKerberosAuthProfileColumnMapping() throws IOException {
+        String authProfile = read("src/main/java/com/stp/missioncontrol/model/ClusterAuthProfile.java");
+        String oracleSchema = read("../deploy/oracle-schema.sql");
+
+        assertThat(authProfile).contains("@Column(name = \"krb5_config_path\")");
+        assertThat(oracleSchema).contains("krb5_config_path VARCHAR2(255 CHAR)");
+        assertThat(oracleSchema).doesNotContain("krb5config_path");
+    }
+
+    @Test
     void operatorDocsDescribeOracleStartupPath() throws IOException {
         String readme = read("../README.md");
         String deployReadme = read("../deploy/README.txt");

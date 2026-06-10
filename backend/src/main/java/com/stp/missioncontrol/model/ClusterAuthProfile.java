@@ -1,6 +1,7 @@
 package com.stp.missioncontrol.model;
 
 import com.stp.missioncontrol.model.MissionControlEnums.AuthProfileType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -41,6 +42,7 @@ public class ClusterAuthProfile {
 
     private String keytabPath;
 
+    @Column(name = "krb5_config_path")
     private String krb5ConfigPath;
 
     private String saslServiceName;
