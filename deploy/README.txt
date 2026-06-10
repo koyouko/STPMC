@@ -15,7 +15,7 @@ Prerequisites: Java 17+ only
 OPTION B: Build from source
 ----------------------------
 1. git clone https://github.com/koyouko/STPMC.git
-2. cd STPMC && git checkout codex/initial-import
+2. cd STPMC && git checkout main
 3. Double-click deploy\build-and-start.bat
 
 Prerequisites: Java 17+ AND Node.js 20+
@@ -50,9 +50,43 @@ Option 2: External PostgreSQL (production / RHEL 8)
   ./stpmc-ctrl.sh start
   (postgres profile is auto-activated when DB_URL contains "postgresql")
 
-First run: Tables are created automatically (ddl-auto=update).
-Production: After initial setup, set HIBERNATE_DDL_AUTO=validate
-            to prevent schema changes on startup.
+Option 3: External Oracle (production / RHEL 8)
+  See oracle-database-team-request.md for the DB team setup request
+  and email template. Send oracle-capacity-plan.md for DBA sizing.
+  sqlplus STP_KAFKA_HC_MISSION_CONTROL/your_password@//your-host:1521/YOUR_SERVICE @oracle-schema.sql
+  DB_URL=jdbc:oracle:thin:@//your-host:1521/YOUR_SERVICE \
+  DB_USERNAME=STP_KAFKA_HC_MISSION_CONTROL \
+  DB_PASSWORD=your_password \
+  DB_SCHEMA=STP_KAFKA_HC_MISSION_CONTROL \
+  DB_TABLE_PREFIX=STP_Kafka_HC_ \
+  SPRING_PROFILES_ACTIVE=oracle \
+  HIBERNATE_DDL_AUTO=validate \
+  ./start.sh start
+  (oracle profile is auto-activated when DB_URL starts with "jdbc:oracle")
+  Update DB_URL, DB_USERNAME, DB_PASSWORD, DB_SCHEMA, and DB_TABLE_PREFIX in the runtime environment.
+  DB_USERNAME is the login account; DB_SCHEMA owns the tables.
+  DB_TABLE_PREFIX defaults to STP_Kafka_HC_.
+  For AD login, use DB_USERNAME=stcmc, DB_SCHEMA=STP_KAFKA_HC_MISSION_CONTROL,
+  and DB_TABLE_PREFIX=STP_Kafka_HC_.
+  Do not hardcode real passwords in application-oracle.yml or commit them.
+
+PostgreSQL first run: Tables are created automatically when ddl-auto=update.
+Oracle production: Create or migrate the schema separately, then keep
+                   HIBERNATE_DDL_AUTO=validate.
+
+Oracle troubleshooting: If startup fails with
+  Schema-validation: missing table [STP_Kafka_HC_audit_events]
+the app connected to Oracle, but DB_SCHEMA/DB_TABLE_PREFIX does not match the
+tables or the DDL has not been applied. Check:
+  SELECT owner, table_name FROM all_tables WHERE UPPER(table_name) = 'STP_KAFKA_HC_AUDIT_EVENTS';
+
+Oracle troubleshooting: If startup fails with
+  Failed to load driver class oracle.jdbc.OracleDriver
+delete the old deploy/mission-control.jar and run start.sh/start.bat again,
+or rebuild from source with:
+  bash deploy/build-bundle.sh
 
 Migration note: If upgrading from a previous version, run:
   ALTER TABLE clusters ADD COLUMN jmx_cluster_id VARCHAR(255);
+For prefixed Oracle tables, use:
+  ALTER TABLE STP_Kafka_HC_clusters ADD jmx_cluster_id VARCHAR2(255 CHAR);

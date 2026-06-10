@@ -93,6 +93,86 @@ HIBERNATE_DDL_AUTO=validate \
 
 The `postgres` profile auto-activates when `DB_URL` contains "postgresql". See `application-postgres.yml` for all configurable settings.
 
+### Oracle (persistent data)
+
+Activate the `oracle` Spring profile to connect the backend to Oracle:
+
+```bash
+DB_URL=jdbc:oracle:thin:@//your-host:1521/YOUR_SERVICE \
+DB_USERNAME=STP_KAFKA_HC_MISSION_CONTROL \
+DB_PASSWORD=your_password \
+DB_SCHEMA=STP_KAFKA_HC_MISSION_CONTROL \
+DB_TABLE_PREFIX=STP_Kafka_HC_ \
+SPRING_PROFILES_ACTIVE=oracle \
+HIBERNATE_DDL_AUTO=validate \
+./deploy/start.sh start
+```
+
+Update the connection by setting `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, and
+`DB_SCHEMA` in the runtime environment. `DB_USERNAME` is the login account.
+`DB_SCHEMA` is the Oracle schema that owns the tables. `DB_TABLE_PREFIX`
+defaults to `STP_Kafka_HC_`, so the app validates tables such as
+`STP_Kafka_HC_audit_events`. Do not hardcode the real
+password in
+`application-oracle.yml` or commit it to git. For production, put `DB_PASSWORD`
+in the approved secret store, service manager, or deployment environment.
+
+If you must log in with the AD / Windows account `stcmc`, keep the application
+schema separate:
+
+```bash
+DB_USERNAME=stcmc
+DB_SCHEMA=STP_KAFKA_HC_MISSION_CONTROL
+DB_TABLE_PREFIX=STP_Kafka_HC_
+```
+
+The `stcmc` account must have direct `SELECT`, `INSERT`, `UPDATE`, and `DELETE`
+grants on the `STP_KAFKA_HC_MISSION_CONTROL` tables. The Oracle profile runs
+`ALTER SESSION SET CURRENT_SCHEMA=$DB_SCHEMA` for each connection.
+
+For local Maven testing, use the same variables:
+
+```bash
+cd backend
+SPRING_PROFILES_ACTIVE=oracle \
+DB_URL=jdbc:oracle:thin:@//your-host:1521/YOUR_SERVICE \
+DB_USERNAME=STP_KAFKA_HC_MISSION_CONTROL \
+DB_PASSWORD=your_password \
+DB_SCHEMA=STP_KAFKA_HC_MISSION_CONTROL \
+DB_TABLE_PREFIX=STP_Kafka_HC_ \
+HIBERNATE_DDL_AUTO=validate \
+./mvnw spring-boot:run
+```
+
+The Linux launcher also auto-activates the `oracle` profile when `DB_URL` starts with `jdbc:oracle`. See `application-oracle.yml` for all configurable settings. The default Oracle schema/user is `STP_KAFKA_HC_MISSION_CONTROL`, matching the requested `STP_Kafka_HC_` naming prefix without quoted Oracle identifiers. For production Oracle schemas, keep `HIBERNATE_DDL_AUTO=validate` and apply reviewed DDL migrations outside application startup.
+
+For a fresh Oracle schema, apply the included DDL first:
+
+```bash
+sqlplus STP_KAFKA_HC_MISSION_CONTROL/your_password@//your-host:1521/YOUR_SERVICE @deploy/oracle-schema.sql
+```
+
+For Oracle DBA sizing, send `deploy/oracle-capacity-plan.md` with the schema
+request. It includes the expected row-growth formula, default 60-second health
+poll assumptions, retention guidance, and tablespace sizing scenarios.
+
+If startup fails with `Schema-validation: missing table [STP_Kafka_HC_audit_events]`,
+the app is connected to Oracle but the schema it is validating does not contain
+the prefixed tables. Confirm the DDL was applied and that `DB_SCHEMA` and
+`DB_TABLE_PREFIX` point to the owner/table naming convention:
+
+```sql
+SELECT owner, table_name
+FROM all_tables
+WHERE UPPER(table_name) = 'STP_KAFKA_HC_AUDIT_EVENTS';
+```
+
+If startup fails with `Failed to load driver class oracle.jdbc.OracleDriver`,
+the running `mission-control.jar` is old and does not include the Oracle JDBC
+driver. Delete `deploy/mission-control.jar` and run `deploy/start.sh` or
+`deploy/start.bat` again to reassemble it from the updated split parts, or
+rebuild the bundle with `bash deploy/build-bundle.sh`.
+
 ### Windows backend commands
 
 Use the Maven wrapper on Windows like this:
@@ -208,9 +288,11 @@ Set `HIBERNATE_DDL_AUTO=validate` (default). Run this migration for JMX auto-onb
 ALTER TABLE clusters ADD COLUMN jmx_cluster_id VARCHAR(255);
 ```
 
+For Oracle, use `deploy/oracle-schema.sql` for a fresh schema or translate the migration above to your existing prefixed Oracle table, for example `STP_Kafka_HC_clusters` with `VARCHAR2(255 CHAR)`.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DB_URL` | H2 in-memory | JDBC URL (PostgreSQL recommended for prod) |
+| `DB_URL` | H2 in-memory | JDBC URL (PostgreSQL or Oracle for prod) |
 | `DB_USERNAME` / `DB_PASSWORD` | sa / (empty) | Database credentials |
 | `APP_SECURITY_MODE` | saml | `saml` or `development` |
 | `APP_ALLOWED_ORIGIN` | http://localhost:5173 | CORS allowed origin |
@@ -227,6 +309,6 @@ ALTER TABLE clusters ADD COLUMN jmx_cluster_id VARCHAR(255);
 ## Verification
 
 ```bash
-cd backend && ./mvnw test        # 20 tests: security, API, service layer
+cd backend && ./mvnw test        # 25 tests: security, API, service layer, Oracle wiring
 cd frontend && npm run build     # TypeScript compile + Vite production build
 ```

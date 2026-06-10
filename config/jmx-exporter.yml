@@ -18,16 +18,24 @@ rules:
       clusterId: "$1"
     type: UNTYPED
 
-  # ── Broker throughput — all-topics aggregate (OneMinuteRate) ──────
-  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(MessagesInPerSec|BytesInPerSec|BytesOutPerSec)><>OneMinuteRate'
+  # ── Broker throughput / request rates — all-topics aggregate ──────
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(MessagesInPerSec|BytesInPerSec|BytesOutPerSec|TotalProduceRequestsPerSec|TotalFetchRequestsPerSec)><>OneMinuteRate'
     name: kafka_server_BrokerTopicMetrics_$1_OneMinuteRate
     type: GAUGE
 
-  # Per-topic (kept for completeness; LenseIQ uses the aggregate above)
-  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(MessagesInPerSec|BytesInPerSec|BytesOutPerSec), topic=(.+)><>OneMinuteRate'
+  # Per-topic metrics used by the Grafana hot-topics dashboard.
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(MessagesInPerSec|BytesInPerSec|BytesOutPerSec|TotalProduceRequestsPerSec|TotalFetchRequestsPerSec), topic=(.+)><>OneMinuteRate'
     name: kafka_server_BrokerTopicMetrics_$1_OneMinuteRate
     labels:
       topic: "$2"
+    type: GAUGE
+
+  # Per-partition log size used by the Grafana hot-topics dashboard.
+  - pattern: 'kafka.log<type=Log, name=Size, topic=(.+), partition=(.+)><>Value'
+    name: kafka_log_log_size
+    labels:
+      topic: "$1"
+      partition: "$2"
     type: GAUGE
 
   # ── Replica manager ───────────────────────────────────────────────

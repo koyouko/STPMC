@@ -60,6 +60,12 @@ services:
       - ./config/jmx_prometheus_javaagent-0.15.0.jar:/opt/jmx-exporter/jmx_prometheus_javaagent.jar:ro
       - ./config/kafka_broker.yml:/opt/jmx-exporter/kafka-config.yml:ro
       - kafka1-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "KAFKA_OPTS= kafka-topics --bootstrap-server localhost:9092 --list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
 
   kafka2:
     image: confluentinc/cp-kafka:7.8.0
@@ -92,6 +98,12 @@ services:
       - ./config/jmx_prometheus_javaagent-0.15.0.jar:/opt/jmx-exporter/jmx_prometheus_javaagent.jar:ro
       - ./config/kafka_broker.yml:/opt/jmx-exporter/kafka-config.yml:ro
       - kafka2-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "KAFKA_OPTS= kafka-topics --bootstrap-server localhost:9092 --list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
 
   kafka3:
     image: confluentinc/cp-kafka:7.8.0
@@ -124,6 +136,12 @@ services:
       - ./config/jmx_prometheus_javaagent-0.15.0.jar:/opt/jmx-exporter/jmx_prometheus_javaagent.jar:ro
       - ./config/kafka_broker.yml:/opt/jmx-exporter/kafka-config.yml:ro
       - kafka3-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "KAFKA_OPTS= kafka-topics --bootstrap-server localhost:9092 --list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
 
   # ── AKHQ (Kafka HQ) web UI ────────────────────────────────────────────────
   # Lightweight open-source Kafka admin UI for local dev. Replaces the heavier
@@ -146,8 +164,53 @@ services:
       - kafka2
       - kafka3
 
+  # ── Prometheus (scrapes Kafka JMX exporter) ──────────────────────
+  # UI: http://localhost:9090
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    restart: unless-stopped
+    container_name: lenseiq-prometheus
+    depends_on:
+      kafka1:
+        condition: service_healthy
+      kafka2:
+        condition: service_healthy
+      kafka3:
+        condition: service_healthy
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  # ── Grafana (auto-provisions LenseIQ Kafka dashboards) ───────────
+  # UI: http://localhost:3000  default login: admin / admin
+  grafana:
+    image: grafana/grafana:10.4.0
+    restart: unless-stopped
+    container_name: lenseiq-grafana
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards/lenseiq:ro
+
 volumes:
   mission-control-postgres:
   kafka1-data:
   kafka2-data:
   kafka3-data:
+  prometheus-data:
+  grafana-data:

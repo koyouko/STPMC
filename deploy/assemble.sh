@@ -5,8 +5,20 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 if [ -f mission-control.jar ] && [ "$(wc -c < mission-control.jar)" -gt 1000000 ]; then
-    echo "[OK] mission-control.jar already assembled ($(du -h mission-control.jar | cut -f1))"
-    exit 0
+    if [ -f mission-control.jar.sha256 ]; then
+        if command -v sha256sum &>/dev/null && sha256sum -c mission-control.jar.sha256 &>/dev/null; then
+            echo "[OK] mission-control.jar already assembled ($(du -h mission-control.jar | cut -f1))"
+            exit 0
+        elif command -v shasum &>/dev/null && shasum -a 256 -c mission-control.jar.sha256 &>/dev/null; then
+            echo "[OK] mission-control.jar already assembled ($(du -h mission-control.jar | cut -f1))"
+            exit 0
+        fi
+        echo "[WARN] Existing mission-control.jar checksum does not match split parts; rebuilding it"
+        rm -f mission-control.jar
+    else
+        echo "[OK] mission-control.jar already assembled ($(du -h mission-control.jar | cut -f1))"
+        exit 0
+    fi
 fi
 
 echo "Assembling mission-control.jar from parts..."

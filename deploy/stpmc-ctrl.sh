@@ -9,8 +9,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 JAR="$SCRIPT_DIR/mission-control.jar"
 
-# Auto-assemble JAR from split parts if needed
-if [ ! -f "$JAR" ] || [ "$(wc -c < "$JAR" 2>/dev/null)" -lt 1000000 ]; then
+# Auto-assemble or refresh JAR from split parts if they are present.
+if compgen -G "$SCRIPT_DIR/mission-control.jar.part.*" > /dev/null; then
     bash "$SCRIPT_DIR/assemble.sh"
 fi
 PID_FILE="$SCRIPT_DIR/.mc.pid"
@@ -103,17 +103,22 @@ start_server() {
     exit 0
   fi
 
-  # Auto-detect PostgreSQL profile from DB_URL
+  # Auto-detect persistent database profiles from DB_URL
   PROFILES="${SPRING_PROFILES_ACTIVE:-}"
   if [ -n "${DB_URL:-}" ] && echo "$DB_URL" | grep -qi "postgresql" && ! echo "$PROFILES" | grep -q "postgres"; then
     PROFILES="${PROFILES:+$PROFILES,}postgres"
+  fi
+  if [ -n "${DB_URL:-}" ] && echo "$DB_URL" | grep -qi "jdbc:oracle" && ! echo "$PROFILES" | grep -q "oracle"; then
+    PROFILES="${PROFILES:+$PROFILES,}oracle"
   fi
   PROFILE_ARG=""
   if [ -n "$PROFILES" ]; then
     PROFILE_ARG="--spring.profiles.active=$PROFILES"
   fi
 
-  if echo "${PROFILES:-}" | grep -q "postgres"; then
+  if echo "${PROFILES:-}" | grep -q "oracle"; then
+    DB_DISPLAY="Oracle (${DB_URL:-external datasource})"
+  elif echo "${PROFILES:-}" | grep -q "postgres"; then
     DB_DISPLAY="PostgreSQL (${DB_URL:-docker-compose defaults})"
   else
     DB_DISPLAY="H2 (in-memory)"
@@ -220,14 +225,18 @@ usage() {
   Common environment variables:
     MC_PORT=8080                           HTTP port (default 8080)
     SPRING_PROFILES_ACTIVE=postgres        Use PostgreSQL instead of H2
+    SPRING_PROFILES_ACTIVE=oracle          Use Oracle instead of H2
     APP_SECURITY_MODE=saml                 Auth mode (saml|development)
     APP_SECRETS_BASE_DIR=/etc/secrets      Base dir for secret files
     APP_ALLOWED_ORIGIN=http://host:port    Extra CORS allowed origin
     APP_LOCAL_KAFKA_BOOTSTRAP=host:9092    Bootstrap servers (dev seed)
     APP_SEED_DEMO_DATA=true                Seed demo data on empty DB
     APP_SEED_LOCAL_DEV_CLUSTER=true        Seed the 'Local Kafka Dev' cluster
-    DB_URL=jdbc:postgresql://...           Database JDBC URL
+    DB_URL=jdbc:postgresql://...           PostgreSQL JDBC URL
+    DB_URL=jdbc:oracle:thin:@//...         Oracle JDBC URL
     DB_USERNAME / DB_PASSWORD              Database credentials
+    DB_SCHEMA=STP_KAFKA_HC_...             Oracle schema that owns app tables
+    DB_TABLE_PREFIX=STP_Kafka_HC_          Oracle application table prefix
 
   Scraper tuning (see /api/platform/metrics/config for live values):
     APP_METRICS_SCRAPE_TIMEOUT_MS=150000   Per-request HTTP timeout (ms)
