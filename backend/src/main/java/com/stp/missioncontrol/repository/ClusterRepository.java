@@ -18,5 +18,14 @@ public interface ClusterRepository extends JpaRepository<Cluster, UUID> {
     Optional<Cluster> findDetailedById(UUID id);
 
     @EntityGraph(attributePaths = {"listeners", "listeners.authProfile", "serviceEndpoints", "healthSnapshot", "healthSnapshot.components"})
+    List<Cluster> findByActiveTrue();
+
+    @EntityGraph(attributePaths = {"listeners", "listeners.authProfile", "serviceEndpoints", "healthSnapshot", "healthSnapshot.components"})
     List<Cluster> findByEnvironment(ClusterEnvironment environment);
+
+    boolean existsByJmxClusterIdAndActiveTrue(String jmxClusterId);
+
+    boolean existsByActiveTrue();
+
+    boolean existsByActiveTrueAndNameIgnoreCase(String name);
 }

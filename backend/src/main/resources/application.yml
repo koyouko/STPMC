@@ -5,10 +5,10 @@ spring:
     password: ${DB_PASSWORD:}
   h2:
     console:
-      enabled: true
+      enabled: ${H2_CONSOLE_ENABLED:false}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: ${HIBERNATE_DDL_AUTO:update}
     open-in-view: false
     properties:
       hibernate:
@@ -29,16 +29,26 @@ app:
     allowed-origins:
       - ${APP_ALLOWED_ORIGIN:http://localhost:5173}
       - http://localhost:8080
+    secrets-base-dir: ${APP_SECRETS_BASE_DIR:/etc/secrets}
   health:
     poll-interval-ms: ${APP_HEALTH_POLL_INTERVAL_MS:60000}
     stale-after-ms: ${APP_HEALTH_STALE_AFTER_MS:180000}
     refresh-cooldown-ms: ${APP_HEALTH_REFRESH_COOLDOWN_MS:60000}
     kafka-timeout-ms: ${APP_KAFKA_TIMEOUT_MS:4000}
     probe-timeout-ms: ${APP_PROBE_TIMEOUT_MS:3000}
-  self-service:
-    kafka-timeout-ms: ${APP_SELF_SERVICE_KAFKA_TIMEOUT_MS:10000}
+  metrics:
+    # Per-request HTTP timeout (ms) for scraping a single JMX /metrics
+    # endpoint. Default is generous (150s) because some production
+    # JMX exporters can take 1-2 min to return on heavily loaded brokers
+    # with thousands of MBeans. Tune down (e.g. 10000) in fast networks
+    # where you want failure detection within seconds.
+    scrape-timeout-ms: ${APP_METRICS_SCRAPE_TIMEOUT_MS:150000}
+    # Background auto-scrape interval in ms. Set to 0 to disable auto-scraping.
+    scrape-interval-ms: ${APP_METRICS_SCRAPE_INTERVAL_MS:60000}
+    # Delay before the first auto-scrape after app startup, in ms.
+    scrape-initial-delay-ms: ${APP_METRICS_SCRAPE_INITIAL_DELAY_MS:30000}
   defaults:
-    seed-demo-data: ${APP_SEED_DEMO_DATA:true}
-    seed-local-dev-cluster: ${APP_SEED_LOCAL_DEV_CLUSTER:true}
+    seed-demo-data: ${APP_SEED_DEMO_DATA:false}
+    seed-local-dev-cluster: ${APP_SEED_LOCAL_DEV_CLUSTER:false}
     local-kafka-bootstrap: ${APP_LOCAL_KAFKA_BOOTSTRAP:localhost:9092}
     local-schema-registry-url: ${APP_LOCAL_SCHEMA_REGISTRY_URL:http://localhost:9003}

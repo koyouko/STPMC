@@ -36,15 +36,17 @@ public class GlobalExceptionHandler {
                     "ACL operations are not available \u2014 the Kafka broker does not have an Authorizer configured.");
         }
 
+        // Log full detail server-side, return sanitized message to client
         log.error("Unhandled runtime exception", ex);
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, message);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, sanitize(message));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
+        // Log full detail server-side, return generic message to client
         log.error("Unhandled exception", ex);
-        String message = ex.getMessage() != null ? ex.getMessage() : "Unexpected error";
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, message);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR,
+                "An unexpected error occurred. Check server logs for details.");
     }
 
     private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {
@@ -56,13 +58,35 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(body);
     }
 
+    /**
+     * Strips infrastructure details (broker addresses, Java class names, stack fragments)
+     * from exception messages before returning them to API clients.
+     */
+    private String sanitize(String message) {
+        if (message == null || message.isBlank()) {
+            return "Internal server error";
+        }
+        // Strip host:port patterns (e.g., "broker1.internal:9092")
+        String cleaned = message.replaceAll("[\\w.-]+:\\d{2,5}", "***");
+        // Strip Java class names (e.g., "org.apache.kafka.common.errors.TimeoutException")
+        cleaned = cleaned.replaceAll("[a-z]+\\.[a-z]+\\.[a-z]+[\\w.]*Exception", "error");
+        // Strip stack trace fragments (e.g., "at com.foo.Bar.method(Bar.java:42)")
+        cleaned = cleaned.replaceAll("at [\\w.$]+\\([^)]*\\)", "");
+        // Collapse excessive whitespace
+        cleaned = cleaned.replaceAll("\\s{2,}", " ").trim();
+        return cleaned.isEmpty() ? "Internal server error" : cleaned;
+    }
+
     private boolean containsCause(Throwable t, String className) {
         Throwable current = t;
-        while (current != null) {
+        int depth = 0;
+        while (current != null && depth++ < 20) {
             if (current.getClass().getSimpleName().equals(className)) {
                 return true;
             }
-            current = current.getCause();
+            Throwable next = current.getCause();
+            if (next == current) break;
+            current = next;
         }
         return false;
     }

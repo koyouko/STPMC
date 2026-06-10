@@ -1,19 +1,22 @@
 package com.stp.missioncontrol.controller;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnResource;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * Forwards all non-API, non-static requests to index.html for SPA routing.
- * Only active when the frontend dist is served from the same Spring Boot JAR.
+ * Forwards non-API routes to index.html for SPA client-side routing.
+ * Only active when the frontend build is bundled in the JAR (static/index.html exists).
+ * When running the backend as a standalone API, this controller is not loaded.
  */
 @Controller
+@ConditionalOnResource(resources = "classpath:/static/index.html")
 public class SpaForwardController {
 
     @RequestMapping(value = {
             "/",
             "/clusters/**",
-            "/self-service/**",
+            "/metrics/**",
             "/audit/**"
     })
     public String forward() {

@@ -13,6 +13,9 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.List;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,15 +27,31 @@ import static com.stp.missioncontrol.model.MissionControlEnums.TokenScope.HEALTH
 @Configuration
 public class DataSeeder {
 
+    private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
+
     @Bean
     CommandLineRunner seedDemoData(
             AppProperties properties,
             ClusterService clusterService,
             HealthService healthService,
-            ServiceAccountService serviceAccountService
+            ServiceAccountService serviceAccountService,
+            @Value("${spring.datasource.url:}") String datasourceUrl
     ) {
         return args -> {
             if (clusterService.hasClusters()) {
+                return;
+            }
+
+            // Guard: skip demo seeding when a production database is detected
+            // unless explicitly opted in via APP_SEED_DEMO_DATA=true
+            boolean isProductionDb = datasourceUrl.contains("postgresql")
+                    || datasourceUrl.contains("mysql")
+                    || datasourceUrl.contains("oracle");
+            if (isProductionDb) {
+                String dbType = datasourceUrl.contains("postgresql") ? "postgresql"
+                        : datasourceUrl.contains("mysql") ? "mysql" : "oracle";
+                log.warn("Production database detected (type: {}). Demo data seeding skipped. "
+                        + "Set APP_SEED_DEMO_DATA=true explicitly to override.", dbType);
                 return;
             }
 
@@ -64,15 +83,7 @@ public class DataSeeder {
                                                 null
                                         )
                                 )),
-                                List.of(new ApiDtos.ServiceEndpointRequest(
-                                        ComponentKind.SCHEMA_REGISTRY,
-                                        ServiceEndpointProtocol.HTTP,
-                                        properties.defaults().localSchemaRegistryUrl(),
-                                        null,
-                                        null,
-                                        "/subjects",
-                                        "local"
-                                ))
+                                List.of()
                         ),
                         "bootstrap"
                 );

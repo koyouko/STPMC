@@ -1,0 +1,68 @@
+# Prometheus JMX Exporter config — agent mode (runs inside Kafka JVM)
+# Metric names match what LenseIQ MetricsScraperService expects (PascalCase).
+# Mount this as /opt/jmx-exporter/kafka-config.yml inside the container.
+
+lowercaseOutputName: false
+lowercaseOutputLabelNames: false
+
+rules:
+  # ── Cluster ID (key for auto-grouping in LenseIQ) ─────────────────
+  # The ClusterId MBean has a string value attribute containing the UUID.
+  # JMX exporter 1.x exposes string attrs as: metric{attr="full_mbean_value"} 1.0
+  # We let the default export handle this, then parse the clusterId label
+  # in MetricsScraperService.
+  - pattern: 'kafka.server<type=KafkaServer, name=ClusterId><>Value: (.+)'
+    name: kafka_server_KafkaServer_ClusterId
+    value: 1
+    labels:
+      clusterId: "$1"
+    type: UNTYPED
+
+  # ── Broker throughput — all-topics aggregate (OneMinuteRate) ──────
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(MessagesInPerSec|BytesInPerSec|BytesOutPerSec)><>OneMinuteRate'
+    name: kafka_server_BrokerTopicMetrics_$1_OneMinuteRate
+    type: GAUGE
+
+  # Per-topic (kept for completeness; LenseIQ uses the aggregate above)
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(MessagesInPerSec|BytesInPerSec|BytesOutPerSec), topic=(.+)><>OneMinuteRate'
+    name: kafka_server_BrokerTopicMetrics_$1_OneMinuteRate
+    labels:
+      topic: "$2"
+    type: GAUGE
+
+  # ── Replica manager ───────────────────────────────────────────────
+  - pattern: 'kafka.server<type=ReplicaManager, name=(UnderReplicatedPartitions|LeaderCount|PartitionCount)><>Value'
+    name: kafka_server_ReplicaManager_$1
+    type: GAUGE
+
+  - pattern: 'kafka.server<type=ReplicaManager, name=(IsrShrinksPerSec|IsrExpandsPerSec)><>OneMinuteRate'
+    name: kafka_server_ReplicaManager_$1_OneMinuteRate
+    type: GAUGE
+
+  # ── Controller ────────────────────────────────────────────────────
+  - pattern: 'kafka.controller<type=KafkaController, name=(ActiveControllerCount|OfflinePartitionsCount)><>Value'
+    name: kafka_controller_KafkaController_$1
+    type: GAUGE
+
+  # ── Broker state (3=Running) ──────────────────────────────────────
+  - pattern: 'kafka.server<type=KafkaServer, name=BrokerState><>Value'
+    name: kafka_server_KafkaServer_BrokerState
+    type: GAUGE
+
+  # ── Request handler idle ratio (0..1) ─────────────────────────────
+  - pattern: 'kafka.server<type=KafkaRequestHandlerPool, name=RequestHandlerAvgIdlePercent><>OneMinuteRate'
+    name: kafka_server_KafkaRequestHandlerPool_RequestHandlerAvgIdlePercent
+    type: GAUGE
+
+  # ── JVM heap (used by jvm_memory_bytes_used/max{area="heap"}) ────
+  - pattern: 'java.lang<type=Memory><HeapMemoryUsage>used'
+    name: jvm_memory_bytes_used
+    labels:
+      area: heap
+    type: GAUGE
+
+  - pattern: 'java.lang<type=Memory><HeapMemoryUsage>max'
+    name: jvm_memory_bytes_max
+    labels:
+      area: heap
+    type: GAUGE

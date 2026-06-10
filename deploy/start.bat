@@ -8,6 +8,11 @@ echo   STP Kafka Mission Control - Demo Launcher
 echo  =============================================
 echo.
 
+:: Auto-assemble JAR from split parts if needed
+if not exist "%~dp0mission-control.jar" (
+    call "%~dp0assemble.bat"
+)
+
 :: Check Java
 where java >nul 2>nul
 if not %errorlevel%==0 (

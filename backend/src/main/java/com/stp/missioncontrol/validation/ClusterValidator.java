@@ -120,7 +120,7 @@ public class ClusterValidator {
     }
 
     private boolean nameExists(String name, UUID excludeClusterId) {
-        return clusterRepository.findAll().stream()
+        return clusterRepository.findByActiveTrue().stream()
                 .filter(cluster -> excludeClusterId == null || !cluster.getId().equals(excludeClusterId))
                 .anyMatch(cluster -> cluster.getName().equalsIgnoreCase(name));
     }

@@ -1,15 +1,153 @@
 services:
+  # ── PostgreSQL (LenseIQ persistence) ────────────────────────────
   postgres:
-    image: postgres:16
-    container_name: stp-mission-control-postgres
+    image: postgres:17-alpine
+    restart: unless-stopped
+    container_name: lenseiq-postgres
     environment:
-      POSTGRES_DB: mission_control
-      POSTGRES_USER: mission_control
-      POSTGRES_PASSWORD: mission_control
+      POSTGRES_DB: ${POSTGRES_DB:-mission_control}
+      POSTGRES_USER: ${POSTGRES_USER:-mission_control}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mission_control}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mission_control}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - mission-control-postgres:/var/lib/postgresql/data
 
+  # ── Confluent Kafka KRaft cluster — 3 nodes, shared cluster ID ────────────
+  # One cluster, three brokers, three JMX exporters.
+  #
+  #   broker 1:  bootstrap localhost:9092   JMX http://localhost:4001/metrics
+  #   broker 2:  bootstrap localhost:9094   JMX http://localhost:4002/metrics
+  #   broker 3:  bootstrap localhost:9095   JMX http://localhost:4003/metrics
+  #
+  # All three share CLUSTER_ID + quorum voters list → the scraper should see
+  # three brokers under the same clusterName, and (because kafka_broker.yml has
+  # the ClusterId rule) the same JMX cluster ID.
+  # ──────────────────────────────────────────────────────────────────────────
+  kafka1:
+    image: confluentinc/cp-kafka:7.8.0
+    restart: unless-stopped
+    container_name: lenseiq-kafka1
+    hostname: kafka1
+    environment:
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka1:9093,2@kafka2:9093,3@kafka3:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://kafka1:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka1:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka1:29092,PLAINTEXT_HOST://localhost:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OPTS: "-javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent.jar=4000:/opt/jmx-exporter/kafka-config.yml"
+      KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseG1GC -XX:MaxGCPauseMillis=20"
+      KAFKA_HEAP_OPTS: "-Xmx768M -Xms512M"
+    ports:
+      - "127.0.0.1:9092:9092"
+      - "127.0.0.1:4001:4000"
+    volumes:
+      - ./config/jmx_prometheus_javaagent-0.15.0.jar:/opt/jmx-exporter/jmx_prometheus_javaagent.jar:ro
+      - ./config/kafka_broker.yml:/opt/jmx-exporter/kafka-config.yml:ro
+      - kafka1-data:/var/lib/kafka/data
+
+  kafka2:
+    image: confluentinc/cp-kafka:7.8.0
+    restart: unless-stopped
+    container_name: lenseiq-kafka2
+    hostname: kafka2
+    environment:
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_NODE_ID: 2
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka1:9093,2@kafka2:9093,3@kafka3:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://kafka2:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka2:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka2:29092,PLAINTEXT_HOST://localhost:9094"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OPTS: "-javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent.jar=4000:/opt/jmx-exporter/kafka-config.yml"
+      KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseG1GC -XX:MaxGCPauseMillis=20"
+      KAFKA_HEAP_OPTS: "-Xmx768M -Xms512M"
+    ports:
+      - "127.0.0.1:9094:9092"
+      - "127.0.0.1:4002:4000"
+    volumes:
+      - ./config/jmx_prometheus_javaagent-0.15.0.jar:/opt/jmx-exporter/jmx_prometheus_javaagent.jar:ro
+      - ./config/kafka_broker.yml:/opt/jmx-exporter/kafka-config.yml:ro
+      - kafka2-data:/var/lib/kafka/data
+
+  kafka3:
+    image: confluentinc/cp-kafka:7.8.0
+    restart: unless-stopped
+    container_name: lenseiq-kafka3
+    hostname: kafka3
+    environment:
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_NODE_ID: 3
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka1:9093,2@kafka2:9093,3@kafka3:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://kafka3:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka3:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka3:29092,PLAINTEXT_HOST://localhost:9095"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OPTS: "-javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent.jar=4000:/opt/jmx-exporter/kafka-config.yml"
+      KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseG1GC -XX:MaxGCPauseMillis=20"
+      KAFKA_HEAP_OPTS: "-Xmx768M -Xms512M"
+    ports:
+      - "127.0.0.1:9095:9092"
+      - "127.0.0.1:4003:4000"
+    volumes:
+      - ./config/jmx_prometheus_javaagent-0.15.0.jar:/opt/jmx-exporter/jmx_prometheus_javaagent.jar:ro
+      - ./config/kafka_broker.yml:/opt/jmx-exporter/kafka-config.yml:ro
+      - kafka3-data:/var/lib/kafka/data
+
+  # ── AKHQ (Kafka HQ) web UI ────────────────────────────────────────────────
+  # Lightweight open-source Kafka admin UI for local dev. Replaces the heavier
+  # Confluent Control Center for inspection / topic browsing / consumer lag.
+  #   http://localhost:9021
+  # ──────────────────────────────────────────────────────────────────────────
+  akhq:
+    image: tchiotludo/akhq:0.25.1
+    restart: unless-stopped
+    container_name: lenseiq-akhq
+    hostname: akhq
+    environment:
+      MICRONAUT_CONFIG_FILES: /app/application.yml
+    ports:
+      - "127.0.0.1:9021:8080"
+    volumes:
+      - ./config/akhq.yml:/app/application.yml:ro
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+
 volumes:
   mission-control-postgres:
+  kafka1-data:
+  kafka2-data:
+  kafka3-data:

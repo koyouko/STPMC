@@ -1,15 +1,19 @@
-import type { ClusterHealthDetailResponse } from '../types/api'
+import type { ClusterHealthDetailResponse, MetricsScrapeResponse } from '../types/api'
 import { formatEnvironment, formatLabel, formatTimestamp } from '../utils/formatters'
+import { effectiveClusterStatus } from '../utils/brokerHealth'
 
 interface ClusterDetailProps {
   cluster: ClusterHealthDetailResponse | null
   focusedComponentKind: string | null
   refreshing: boolean
+  /** Latest scrape — when present, the top-right status orb shows the
+   *  composite (HealthService vs scrape-derived) worst-case status. */
+  scrape?: MetricsScrapeResponse | undefined
   onClearComponentFocus: () => void
   onRefresh: () => void
 }
 
-export function ClusterDetail({ cluster, focusedComponentKind, refreshing, onClearComponentFocus, onRefresh }: ClusterDetailProps) {
+export function ClusterDetail({ cluster, focusedComponentKind, refreshing, scrape, onClearComponentFocus, onRefresh }: ClusterDetailProps) {
   if (!cluster) {
     return (
       <section className="detail-panel empty-state">
@@ -19,15 +23,17 @@ export function ClusterDetail({ cluster, focusedComponentKind, refreshing, onCle
     )
   }
 
-  const focusedComponent = focusedComponentKind
-    ? cluster.components.find((component) => component.kind === focusedComponentKind) ?? null
+  const rawFocused = focusedComponentKind
+    ? cluster.components.find((c) => c.kind === focusedComponentKind) ?? null
     : null
+  const focusedComponent = rawFocused?.status === 'NOT_APPLICABLE' ? null : rawFocused
+  const applicableComponents = cluster.components.filter((c) => c.status !== 'NOT_APPLICABLE')
   const orderedComponents = focusedComponent
     ? [
         focusedComponent,
-        ...cluster.components.filter((component) => component.kind !== focusedComponent.kind),
+        ...applicableComponents.filter((component) => component.kind !== focusedComponent.kind),
       ]
-    : cluster.components
+    : applicableComponents
 
   return (
     <section className="detail-panel">
@@ -57,8 +63,8 @@ export function ClusterDetail({ cluster, focusedComponentKind, refreshing, onCle
           <button className="secondary-button" type="button" onClick={onRefresh} disabled={refreshing}>
             {refreshing ? 'Refreshing…' : 'Refresh health'}
           </button>
-          <div className={`status-orb status-orb--${cluster.status.toLowerCase()}`}>
-            <span>{cluster.status}</span>
+          <div className={`status-orb status-orb--${effectiveClusterStatus(cluster, scrape).toLowerCase()}`}>
+            <span>{effectiveClusterStatus(cluster, scrape)}</span>
             <small>Last checked {formatTimestamp(cluster.lastCheckedAt)}</small>
           </div>
         </div>

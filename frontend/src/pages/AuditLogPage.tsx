@@ -1,7 +1,82 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { apiClient } from '../api/client'
 import type { AuditEventResponse, AuditPageResponse } from '../types/api'
-import { SearchBar, DataTable, type ColumnDef } from '../components/SelfServiceUI'
+
+interface ColumnDef<T> {
+  key: keyof T | string
+  label: string
+  sortable?: boolean
+  render?: (row: T) => React.ReactNode
+}
+
+function SearchBar({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <input
+      type="search"
+      className="search-input"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+    />
+  )
+}
+
+function DataTable<T>({
+  columns,
+  data,
+  loading,
+  emptyMessage,
+  rowKey,
+}: {
+  columns: ColumnDef<T>[]
+  data: T[]
+  loading?: boolean
+  emptyMessage?: string
+  rowKey: (row: T) => string
+}) {
+  if (loading) return <div className="loading-card">Loading…</div>
+  if (data.length === 0) return <div className="loading-card">{emptyMessage ?? 'No data.'}</div>
+  return (
+    <table className="data-table" style={{ width: '100%' }}>
+      <thead>
+        <tr>
+          {columns.map((col) => (
+            <th key={String(col.key)}>{col.label}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {data.map((row) => (
+          <tr key={rowKey(row)}>
+            {columns.map((col) => (
+              <td key={String(col.key)}>
+                {col.render ? col.render(row) : String(row[col.key as keyof T] ?? '')}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function getActionBadgeClass(action: string): string {
+  const lower = action.toLowerCase()
+  if (lower.includes('created') || lower.includes('granted')) return 'audit-action-badge--create'
+  if (lower.includes('deleted') || lower.includes('removed') || lower.includes('deactivated')) return 'audit-action-badge--delete'
+  if (lower.includes('revoked')) return 'audit-action-badge--revoke'
+  if (lower.includes('updated') || lower.includes('altered') || lower.includes('reset') || lower.includes('purged') || lower.includes('increased')) return 'audit-action-badge--update'
+  if (lower.includes('refresh') || lower.includes('used')) return 'audit-action-badge--refresh'
+  return ''
+}
+
+function formatTimestamp(ts: string) {
+  const d = new Date(ts)
+  return d.toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  })
+}
 
 export default function AuditLogPage() {
   const [data, setData] = useState<AuditPageResponse | null>(null)
@@ -11,9 +86,12 @@ export default function AuditLogPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Debounce search
+  // Debounce search and reset page together to avoid double-fetch
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 350)
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(0)
+    }, 350)
     return () => clearTimeout(timer)
   }, [search])
 
@@ -33,29 +111,6 @@ export default function AuditLogPage() {
   useEffect(() => {
     loadEvents()
   }, [loadEvents])
-
-  // Reset to page 0 when search changes
-  useEffect(() => {
-    setPage(0)
-  }, [debouncedSearch])
-
-  const getActionBadgeClass = (action: string): string => {
-    const lower = action.toLowerCase()
-    if (lower.includes('created') || lower.includes('granted')) return 'audit-action-badge--create'
-    if (lower.includes('deleted') || lower.includes('removed') || lower.includes('deactivated')) return 'audit-action-badge--delete'
-    if (lower.includes('revoked')) return 'audit-action-badge--revoke'
-    if (lower.includes('updated') || lower.includes('altered') || lower.includes('reset') || lower.includes('purged') || lower.includes('increased')) return 'audit-action-badge--update'
-    if (lower.includes('refresh') || lower.includes('used')) return 'audit-action-badge--refresh'
-    return ''
-  }
-
-  const formatTimestamp = (ts: string) => {
-    const d = new Date(ts)
-    return d.toLocaleString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-    })
-  }
 
   const columns: ColumnDef<AuditEventResponse>[] = useMemo(() => [
     {
@@ -117,7 +172,7 @@ export default function AuditLogPage() {
       <span className="eyebrow">Administration</span>
       <h1>Audit Log</h1>
       <p className="page-subtitle">
-        Track all platform operations — cluster changes, self-service tasks, and service account activity.
+        Track all platform operations — cluster changes, metric scrapes, and service account activity.
       </p>
 
       <div className="audit-filters">

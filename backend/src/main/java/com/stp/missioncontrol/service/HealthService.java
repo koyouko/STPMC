@@ -77,7 +77,7 @@ public class HealthService {
 
     public List<ApiDtos.ClusterHealthSummaryResponse> listClusterHealth(Optional<ServiceAccountPrincipal> principal) {
         principal.ifPresent(current -> requireAnyScope(current, TokenScope.HEALTH_READ, TokenScope.CLUSTER_READ));
-        return clusterRepository.findAll().stream()
+        return clusterRepository.findByActiveTrue().stream()
                 .filter(cluster -> principal.map(p -> p.canAccessCluster(cluster)).orElse(true))
                 .map(this::toSummary)
                 .toList();
@@ -150,8 +150,7 @@ public class HealthService {
             initialDelayString = "${app.health.poll-interval-ms:60000}"
     )
     public void refreshAllSnapshots() {
-        clusterRepository.findAll().stream()
-                .filter(Cluster::isActive)
+        clusterRepository.findByActiveTrue()
                 .forEach(cluster -> {
                     HealthRefreshOperation operation = refreshOperationRepository.save(
                             new HealthRefreshOperation(cluster, RefreshTriggerType.SCHEDULED, "scheduler")

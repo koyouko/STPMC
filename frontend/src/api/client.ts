@@ -1,54 +1,47 @@
 import type {
-  AclListResponse,
-  AclOperationResponse,
   AuditPageResponse,
+  BrokerMetricsSample,
   ClusterConfigResponse,
   ClusterHealthDetailResponse,
   ClusterHealthSummaryResponse,
-  ConsumerGroupDeleteResponse,
-  ConsumerGroupDescribeResponse,
-  ConsumerGroupListResponse,
   CreateClusterRequest,
   CreateServiceAccountRequest,
   CreateServiceAccountTokenRequest,
-  CreateTopicResponse,
-  DeleteTopicResponse,
-  IncreasePartitionsResponse,
-  MessageCountResponse,
-  OffsetResetResponse,
+  MetricsTargetResponse,
+  MetricsScrapeResponse,
   RefreshOperationResponse,
   ServiceAccountResponse,
   ServiceAccountTokenResponse,
-  TaskCatalogEntry,
   TestConnectionRequest,
   TestConnectionResponse,
-  TopicConfigAlterResponse,
-  TopicConfigDescribeResponse,
-  TopicDataDumpResponse,
-  TopicDescribeResponse,
-  TopicListResponse,
-  TopicPurgeResponse,
   UpdateClusterRequest,
-  SchemaSubjectListResponse,
-  SchemaSubjectVersionsResponse,
-  SchemaResponse,
 } from '../types/api'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
-const defaultHeaders = {
+const defaultHeaders: Record<string, string> = {
   'Content-Type': 'application/json',
-  'X-MC-User': 'frontend-operator',
-  'X-MC-Roles': 'PLATFORM_ADMIN,OPERATOR,AUDITOR',
+  // Dev auth headers are only sent during local development.
+  // In production (SAML), authentication is handled by the IdP — these headers are ignored.
+  ...(import.meta.env.DEV
+    ? {
+        'X-MC-User': 'frontend-operator',
+      }
+    : {}),
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData = init?.body instanceof FormData
+  const headers: Record<string, string> = {
+    ...defaultHeaders,
+    ...(init?.headers as Record<string, string> ?? {}),
+  }
+  // Let the browser set Content-Type with boundary for FormData
+  if (isFormData) delete headers['Content-Type']
+
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: {
-      ...defaultHeaders,
-      ...(init?.headers ?? {}),
-    },
+    headers,
   })
 
   if (!response.ok) {
@@ -60,23 +53,31 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     return undefined as T
   }
 
-  return response.json() as Promise<T>
+  const text = await response.text()
+  if (!text) return undefined as T
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error(`Expected JSON response but received unexpected format`)
+  }
 }
 
 export const apiClient = {
+  // ── Clusters ──────────────────────────────────────────────────────
+
   listClusters() {
     return request<ClusterHealthSummaryResponse[]>('/api/platform/clusters')
   },
   getClusterHealth(clusterId: string) {
-    return request<ClusterHealthDetailResponse>(`/api/platform/clusters/${clusterId}/health`)
+    return request<ClusterHealthDetailResponse>(`/api/platform/clusters/${encodeURIComponent(clusterId)}/health`)
   },
   refreshClusterHealth(clusterId: string) {
-    return request<RefreshOperationResponse>(`/api/platform/clusters/${clusterId}/health/refresh`, {
+    return request<RefreshOperationResponse>(`/api/platform/clusters/${encodeURIComponent(clusterId)}/health/refresh`, {
       method: 'POST',
     })
   },
   getClusterConfig(clusterId: string) {
-    return request<ClusterConfigResponse>(`/api/platform/clusters/${clusterId}/config`)
+    return request<ClusterConfigResponse>(`/api/platform/clusters/${encodeURIComponent(clusterId)}/config`)
   },
   createCluster(payload: CreateClusterRequest) {
     return request<ClusterHealthDetailResponse>('/api/platform/clusters', {
@@ -85,13 +86,13 @@ export const apiClient = {
     })
   },
   updateCluster(clusterId: string, payload: UpdateClusterRequest) {
-    return request<ClusterHealthDetailResponse>(`/api/platform/clusters/${clusterId}`, {
+    return request<ClusterHealthDetailResponse>(`/api/platform/clusters/${encodeURIComponent(clusterId)}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     })
   },
   deleteCluster(clusterId: string) {
-    return request<void>(`/api/platform/clusters/${clusterId}`, {
+    return request<void>(`/api/platform/clusters/${encodeURIComponent(clusterId)}`, {
       method: 'DELETE',
     })
   },
@@ -101,6 +102,9 @@ export const apiClient = {
       body: JSON.stringify(payload),
     })
   },
+
+  // ── Service Accounts ──────────────────────────────────────────────
+
   listServiceAccounts() {
     return request<ServiceAccountResponse[]>('/api/admin/service-accounts')
   },
@@ -111,113 +115,60 @@ export const apiClient = {
     })
   },
   createServiceAccountToken(serviceAccountId: string, payload: CreateServiceAccountTokenRequest) {
-    return request<ServiceAccountTokenResponse>(`/api/admin/service-accounts/${serviceAccountId}/tokens`, {
+    return request<ServiceAccountTokenResponse>(`/api/admin/service-accounts/${encodeURIComponent(serviceAccountId)}/tokens`, {
       method: 'POST',
       body: JSON.stringify(payload),
     })
   },
 
-  // ── Self-Service ──────────────────────────────────────────────────
+  // ── Metrics ───────────────────────────────────────────────────────
 
-  getTaskCatalog() {
-    return request<TaskCatalogEntry[]>('/api/platform/self-service/tasks')
+  /**
+   * Upload a CSV inventory file to replace the entire global metrics target list.
+   * Format: clusterName, host, port (optional, default 9404), role (optional, default BROKER), environment (optional, e.g. DEV/SIT/UAT/PTE/PROD, default NON_PROD)
+   */
+  uploadMetricsInventory(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    // Omit Content-Type to let the browser set multipart/form-data with boundary
+    const headers: Record<string, string> = import.meta.env.DEV
+      ? { 'X-MC-User': 'frontend-operator' }
+      : {}
+    return request<MetricsTargetResponse[]>(
+      '/api/platform/metrics/targets/upload',
+      { method: 'POST', body: formData, headers },
+    )
   },
-  listTopics(clusterId: string) {
-    return request<TopicListResponse>(`/api/platform/self-service/${clusterId}/topics`)
+
+  listMetricsTargets() {
+    return request<MetricsTargetResponse[]>('/api/platform/metrics/targets')
   },
-  describeTopic(clusterId: string, topicName: string) {
-    return request<TopicDescribeResponse>(`/api/platform/self-service/${clusterId}/topics/describe`, {
-      method: 'POST',
-      body: JSON.stringify({ topicName }),
-    })
-  },
-  createTopic(clusterId: string, payload: { topicName: string; numPartitions: number; replicationFactor: number; configs?: Record<string, string> }) {
-    return request<CreateTopicResponse>(`/api/platform/self-service/${clusterId}/topics/create`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
-  },
-  deleteTopic(clusterId: string, topicName: string) {
-    return request<DeleteTopicResponse>(`/api/platform/self-service/${clusterId}/topics/${encodeURIComponent(topicName)}`, {
+
+  deleteMetricsTarget(targetId: string) {
+    return request<void>(`/api/platform/metrics/targets/${encodeURIComponent(targetId)}`, {
       method: 'DELETE',
     })
   },
-  purgeTopic(clusterId: string, topicName: string) {
-    return request<TopicPurgeResponse>(`/api/platform/self-service/${clusterId}/topics/purge`, {
-      method: 'POST',
-      body: JSON.stringify({ topicName }),
-    })
+
+  /**
+   * Trigger an on-demand scrape of all configured JMX targets. Brokers are auto-grouped
+   * by the cluster ID discovered from the kafka_server_KafkaServer_ClusterId JMX metric.
+   */
+  scrapeMetrics() {
+    return request<MetricsScrapeResponse>('/api/platform/metrics/scrape')
   },
-  increasePartitions(clusterId: string, topicName: string, newPartitionCount: number) {
-    return request<IncreasePartitionsResponse>(`/api/platform/self-service/${clusterId}/topics/increase-partitions`, {
-      method: 'POST',
-      body: JSON.stringify({ topicName, newPartitionCount }),
-    })
+
+  /**
+   * Returns the most recent scrape snapshot held in server memory, or
+   * undefined (HTTP 204) if no scrape has run since process startup.
+   */
+  getLastScrape(): Promise<MetricsScrapeResponse | undefined> {
+    return request<MetricsScrapeResponse>('/api/platform/metrics/last-scrape') as Promise<MetricsScrapeResponse | undefined>
   },
-  getMessageCount(clusterId: string, topicName: string) {
-    return request<MessageCountResponse>(`/api/platform/self-service/${clusterId}/topics/message-count`, {
-      method: 'POST',
-      body: JSON.stringify({ topicName }),
-    })
-  },
-  describeTopicConfig(clusterId: string, topicName: string) {
-    return request<TopicConfigDescribeResponse>(`/api/platform/self-service/${clusterId}/topics/config/describe`, {
-      method: 'POST',
-      body: JSON.stringify({ topicName }),
-    })
-  },
-  alterTopicConfig(clusterId: string, topicName: string, configsToSet: Record<string, string>, configsToDelete: string[]) {
-    return request<TopicConfigAlterResponse>(`/api/platform/self-service/${clusterId}/topics/config/alter`, {
-      method: 'POST',
-      body: JSON.stringify({ topicName, configsToSet, configsToDelete }),
-    })
-  },
-  dumpTopicMessages(clusterId: string, topicName: string, maxMessages: number, partition?: number) {
-    return request<TopicDataDumpResponse>(`/api/platform/self-service/${clusterId}/topics/data-dump`, {
-      method: 'POST',
-      body: JSON.stringify({ topicName, maxMessages, partition: partition ?? null }),
-    })
-  },
-  listAcls(clusterId: string) {
-    return request<AclListResponse>(`/api/platform/self-service/${clusterId}/acls`)
-  },
-  describeAcls(clusterId: string, principal?: string, resourceName?: string, resourceType?: string) {
-    return request<AclListResponse>(`/api/platform/self-service/${clusterId}/acls/describe`, {
-      method: 'POST',
-      body: JSON.stringify({ principal, resourceName, resourceType }),
-    })
-  },
-  grantAcl(clusterId: string, payload: { principal: string; resourceName: string; resourceType: string; patternType: string; operation: string; permission?: string }) {
-    return request<AclOperationResponse>(`/api/platform/self-service/${clusterId}/acls/grant`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
-  },
-  removeAcl(clusterId: string, payload: { principal: string; resourceName?: string; resourceType?: string; patternType?: string; operation?: string; permission?: string }) {
-    return request<AclOperationResponse>(`/api/platform/self-service/${clusterId}/acls/remove`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
-  },
-  listConsumerGroups(clusterId: string) {
-    return request<ConsumerGroupListResponse>(`/api/platform/self-service/${clusterId}/consumer-groups`)
-  },
-  describeConsumerGroup(clusterId: string, groupId: string) {
-    return request<ConsumerGroupDescribeResponse>(`/api/platform/self-service/${clusterId}/consumer-groups/describe`, {
-      method: 'POST',
-      body: JSON.stringify({ groupId }),
-    })
-  },
-  deleteConsumerGroup(clusterId: string, groupId: string) {
-    return request<ConsumerGroupDeleteResponse>(`/api/platform/self-service/${clusterId}/consumer-groups/${encodeURIComponent(groupId)}`, {
-      method: 'DELETE',
-    })
-  },
-  resetConsumerGroupOffsets(clusterId: string, groupId: string, resetType: string, partitionOffsets?: Record<number, number>) {
-    return request<OffsetResetResponse>(`/api/platform/self-service/${clusterId}/consumer-groups/reset-offsets`, {
-      method: 'POST',
-      body: JSON.stringify({ groupId, resetType, partitionOffsets }),
-    })
+
+  /** Returns client-facing scraper config (currently just the auto-scrape interval). */
+  getMetricsConfig() {
+    return request<{ scrapeIntervalMs: number }>('/api/platform/metrics/config')
   },
 
   // ── Audit ──────────────────────────────────────────────────────────
@@ -227,20 +178,7 @@ export const apiClient = {
     if (search) params.set('search', search)
     return request<AuditPageResponse>(`/api/platform/audit?${params}`)
   },
-
-  // ── Schema Registry ─────────────────────────────────────────────
-
-  listSchemaSubjects(clusterId: string) {
-    return request<SchemaSubjectListResponse>(`/api/platform/self-service/${clusterId}/schemas/subjects`)
-  },
-  getSchemaSubjectVersions(clusterId: string, subject: string) {
-    return request<SchemaSubjectVersionsResponse>(
-      `/api/platform/self-service/${clusterId}/schemas/subjects/${encodeURIComponent(subject)}/versions`,
-    )
-  },
-  getSchemaVersion(clusterId: string, subject: string, version: number) {
-    return request<SchemaResponse>(
-      `/api/platform/self-service/${clusterId}/schemas/subjects/${encodeURIComponent(subject)}/versions/${version}`,
-    )
-  },
 }
+
+// Re-export metrics types so pages don't need a separate import
+export type { BrokerMetricsSample, MetricsScrapeResponse }

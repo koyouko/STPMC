@@ -3,6 +3,7 @@ package com.stp.missioncontrol.model;
 import com.stp.missioncontrol.model.MissionControlEnums.ClusterEnvironment;
 import com.stp.missioncontrol.model.MissionControlEnums.ConnectionMode;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -34,6 +35,9 @@ public class Cluster {
     private ConnectionMode connectionMode;
 
     private String description;
+
+    @Column(name = "jmx_cluster_id")
+    private String jmxClusterId;
 
     private boolean active;
 
@@ -146,6 +150,14 @@ public class Cluster {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getJmxClusterId() {
+        return jmxClusterId;
+    }
+
+    public void setJmxClusterId(String jmxClusterId) {
+        this.jmxClusterId = jmxClusterId;
     }
 
     public void setEnvironment(ClusterEnvironment environment) {

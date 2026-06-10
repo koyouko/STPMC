@@ -7,13 +7,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record AppProperties(
         Security security,
         Health health,
-        SelfService selfService,
+        Metrics metrics,
         Defaults defaults
 ) {
 
     public record Security(
             String mode,
-            List<String> allowedOrigins
+            List<String> allowedOrigins,
+            String secretsBaseDir
     ) {
     }
 
@@ -26,8 +27,12 @@ public record AppProperties(
     ) {
     }
 
-    public record SelfService(
-            int kafkaTimeoutMs
+    public record Metrics(
+            int scrapeTimeoutMs,
+            /** Background auto-scrape interval in ms; 0 disables auto-scraping. */
+            long scrapeIntervalMs,
+            /** Delay before the first auto-scrape after application startup, in ms. */
+            long scrapeInitialDelayMs
     ) {
     }
 
